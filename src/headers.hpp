@@ -10,3 +10,4 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
+#include <boost/function.hpp>

@@ -5,7 +5,7 @@
 
 application::application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id)
         : io_context(io_context), acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
-        joinreq_retry(0), timer(io_context, boost::posix_time::seconds(1))
+        timer(io_context, boost::posix_time::seconds(1))
 {
     boost::system::error_code ec;
     Address address;
@@ -123,41 +123,43 @@ void application::introduce_self_to_group() {
     else
     {
         //add to group
-        uint32_t msgsize;
-        MessageHdr *msg = Serializer::Message::allocEncodeJOINREQ(
-            self.address, self.id, self.ring_id, self.heartbeat, msgsize);
+        auto joinreq = joinreq_client::create(*this);
+        joinreq->start();
+        // uint32_t msgsize;
+        // MessageHdr *msg = Serializer::Message::allocEncodeJOINREQ(
+        //     self.address, self.id, self.ring_id, self.heartbeat, msgsize);
 
-        cout << "Trying to join..." << endl;
+        // cout << "Trying to join..." << endl;
 
         // send JOINREQ message to introducer member
-        bool success = true;
-        try {
-            tcp::resolver resolver(io_context);
-            boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address(bootstrap_address.ip), bootstrap_address.port);
-            tcp::socket socket(io_context);
-            socket.connect(endpoint);
-            boost::asio::write(socket, boost::asio::buffer(msg, msg->size));
-            print_bytes(msg, msg->size);
-        } 
-        catch (std::exception& e)
-        {
-            std::cerr << e.what() << std::endl;
-            success = false;
-        }
-        Serializer::Message::dealloc(msg);
+        // bool success = true;
+        // try {
+        //     tcp::resolver resolver(io_context);
+        //     boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address(bootstrap_address.ip), bootstrap_address.port);
+        //     tcp::socket socket(io_context);
+        //     socket.connect(endpoint);
+        //     boost::asio::write(socket, boost::asio::buffer(msg, msg->size));
+        //     print_bytes(msg, msg->size);
+        // } 
+        // catch (std::exception& e)
+        // {
+        //     std::cerr << e.what() << std::endl;
+        //     success = false;
+        // }
+        // Serializer::Message::dealloc(msg);
 
-        if (!success) {
-            if (joinreq_retry++ < 5) {
-                cout << "cannot join the group, retry later ..." << endl;
-                boost::this_thread::sleep_for(boost::chrono::seconds(5 * joinreq_retry));
-                introduce_self_to_group();
-            }
-            else {
-                cout << "failed to join the group" << endl;
-                exit(1);
-            }
-        }
-        cout << "join request is sent" << endl;
+        // if (!success) {
+        //     if (joinreq_retry++ < 5) {
+        //         cout << "cannot join the group, retry later ..." << endl;
+        //         boost::this_thread::sleep_for(boost::chrono::seconds(5 * joinreq_retry));
+        //         introduce_self_to_group();
+        //     }
+        //     else {
+        //         cout << "failed to join the group" << endl;
+        //         exit(1);
+        //     }
+        // }
+        // cout << "join request is sent" << endl;
     }
 }
 

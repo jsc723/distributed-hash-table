@@ -13,10 +13,20 @@ class application;
 class packet_receiver : public boost::enable_shared_from_this<packet_receiver> {
 public:
     typedef boost::shared_ptr<packet_receiver> pointer;
+    typedef boost::function<void(MessageHdr *)> callback_t;
     static pointer create(boost::asio::io_context &io_context, application &app)
     {
         auto conn = new packet_receiver(io_context, app);
         return pointer(conn);
+    }
+    static pointer create(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
+    {
+        auto conn = new packet_receiver(io_context, app, socket);
+        return pointer(conn);
+    }
+
+    void set_callback(callback_t cb) {
+        callback = cb;
     }
 
     void start(); //read packet size
@@ -31,11 +41,16 @@ private:
     packet_receiver(boost::asio::io_context &io_context, application &app)
         : socket(new tcp::socket(io_context)), packet_sz(0), app(app)
         {}
+    packet_receiver(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
+    : socket(socket), packet_sz(0), app(app)
+    {}
     void read_packet(const boost::system::error_code & ec/*error*/,
                       size_t bytes_transferred/*bytes_read*/);
 
     void finish_read(const boost::system::error_code & ec,
                       size_t bytes_transferred);
+
+    callback_t callback;
     shared_ptr<tcp::socket> socket;
     boost::asio::streambuf buffer;
     uint32_t packet_sz;
@@ -67,6 +82,33 @@ private:
     boost::asio::streambuf buffer;
 };
 
+class joinreq_client: public boost::enable_shared_from_this<joinreq_client> {
+public:
+    typedef boost::shared_ptr<joinreq_client> pointer;
+    shared_ptr<tcp::socket> socket;
+
+    static pointer create(application &app) {
+        return pointer(new joinreq_client(app));
+    }
+    void start();
+    void handle_write(const boost::system::error_code & ec,
+                      size_t bytes_transferred, packet_receiver::pointer pr);
+    void handle_response(MessageHdr *msg);
+    ~joinreq_client() {
+        cout << "joinreq client is released" << endl;
+        Serializer::Message::dealloc(msg);
+    }
+
+private:
+    joinreq_client(application &app);
+
+    application &app;
+    boost::asio::streambuf buffer;
+    MessageHdr *msg;
+    boost::asio::deadline_timer timer;
+    int joinreq_retry;
+};
+
 class application
 {
 public:
@@ -94,6 +136,12 @@ public:
     MemberInfo &self_info() {
         return members[0];
     }
+    boost::asio::io_context & get_context() {
+        return io_context;
+    }
+    Address get_bootstrap_address() {
+        return bootstrap_address;
+    }
 private:
     boost::asio::io_context &io_context;
     Address bootstrap_address;
@@ -101,5 +149,4 @@ private:
     
     vector<MemberInfo> members;
     boost::asio::deadline_timer timer;
-    int joinreq_retry;
 };

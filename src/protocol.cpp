@@ -11,7 +11,11 @@ void packet_receiver::start()
 void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec || bytes_transferred != sizeof(uint32_t)) {
-        cout << "did not read the num of bytes to transfer" << endl;
+        cout << "did not read the num of bytes to transfer, bytes transfered = " 
+        << bytes_transferred << endl;
+        if (ec) {
+            cout << ec.message() << endl;
+        }
         return;
     }
     std::istream is(&buffer);
@@ -48,6 +52,10 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
         cout << "failed to read the whole packet, actual = " << actual << endl;
         return;
     }
+    if (callback) {
+        callback(msg);
+        return;
+    }
     switch(msg->msgType) {
         case JOINREQ: {
             cout << "JOINREQ message received" << endl;
@@ -79,4 +87,78 @@ void joinreq_handler::start() {
     cout << "end encode, response_sz = " << response_sz << endl;
     boost::asio::async_write(*socket, boost::asio::buffer(response, response_sz),
                             boost::bind(&joinreq_handler::after_write, shared_from_this()));
+}
+
+joinreq_client::joinreq_client(application &app)
+: app(app), joinreq_retry(0), timer(app.get_context()) {
+    MemberInfo &self = app.self_info();
+    uint32_t msgsize;
+    msg = Serializer::Message::allocEncodeJOINREQ(
+        self.address, self.id, self.ring_id, self.heartbeat, msgsize);
+}
+
+void joinreq_client::start() {
+    cout << "Trying to join..." << endl;
+
+    //send JOINREQ message to introducer member
+    bool success = true;
+    try {
+        tcp::resolver resolver(app.get_context());
+        boost::asio::ip::tcp::endpoint endpoint(
+            boost::asio::ip::address(app.get_bootstrap_address().ip), app.get_bootstrap_address().port);
+        socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
+        socket->connect(endpoint);
+        auto packet_recv = packet_receiver::create(app.get_context(), app, socket);
+        packet_recv->set_callback(boost::bind(
+            &joinreq_client::handle_response, shared_from_this(),
+            boost::placeholders::_1
+        ));
+        boost::asio::async_write(*socket, boost::asio::buffer(msg, msg->size),
+                boost::bind(&joinreq_client::handle_write, shared_from_this(),
+                    boost::asio::placeholders::error,
+                    boost::asio::placeholders::bytes_transferred,
+                    packet_recv
+                ));
+        
+        
+    } 
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+        success = false;
+    }
+    if (!success) {
+        if (joinreq_retry++ < 5) {
+            cout << "cannot join the group, retry later ..." << endl;
+            timer.expires_from_now(boost::posix_time::seconds(5 * joinreq_retry));
+            timer.async_wait(boost::bind(&joinreq_client::start, shared_from_this()));
+        }
+        else {
+            cout << "failed to join the group" << endl;
+            exit(1);
+        }
+    }
+    joinreq_retry = 0;
+}
+
+void joinreq_client::handle_write(const boost::system::error_code & ec, size_t bytes_transferred,
+    packet_receiver::pointer pr) {
+    if (ec || bytes_transferred != msg->size) {
+        if (joinreq_retry++ < 5) {
+            cout << "cannot join the group, retry later ..." << endl;
+            timer.expires_from_now(boost::posix_time::seconds(5 * joinreq_retry));
+            timer.async_wait(boost::bind(&joinreq_client::start, shared_from_this()));
+        }
+        else {
+            cout << "failed to join the group" << endl;
+            exit(1);
+        }
+    }
+    print_bytes(msg, msg->size);
+    pr->start();
+}
+
+void joinreq_client::handle_response(MessageHdr *msg) {
+    printf("heared back from the group!\n");
+    app.self_info().isAlive = true;
 }
