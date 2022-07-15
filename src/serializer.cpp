@@ -33,6 +33,7 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
+    msg->size = msgSize;
     msg->msgType = JOINREQ;
     auto p = (char *)(msg+1);
     p = encodeAddress(p, myaddr);
@@ -58,6 +59,7 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst, ui
     msgSize = sizeof(MessageHdr) + lstSize;
     printf("addr_sz=%d, entry_sz=%d, lst_sz=%d, msg_sz=%d\n", addr_sz, entrySize, lstSize, msgSize);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
+    msg->size = msgSize;
     msg->msgType = AD;
     encodeMemberList((char *)(msg+1), lst);
 

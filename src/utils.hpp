@@ -56,12 +56,13 @@ struct MemberInfo {
 };
 
 enum MsgTypes{
+    DUMMYLASTMSGTYPE = 100,
     JOINREQ, //char addr[6], int ring_id, long heartbeat
-	  AD,      //list of nodes in the group
-    DUMMYLASTMSGTYPE
+	  AD      //list of nodes in the group
 };
 
 struct MessageHdr {
+  uint32_t size;
 	enum MsgTypes msgType;
 };
 

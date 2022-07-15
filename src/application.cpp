@@ -130,15 +130,13 @@ void application::introduce_self_to_group() {
         cout << "Trying to join..." << endl;
 
         // send JOINREQ message to introducer member
-        //emulNet->ENsend(&self.addr, joinaddr, (char *)msg, msgsize);
         bool success = true;
         try {
             tcp::resolver resolver(io_context);
             boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address(bootstrap_address.ip), bootstrap_address.port);
             tcp::socket socket(io_context);
             socket.connect(endpoint);
-            boost::asio::write(socket, boost::asio::buffer(&msgsize, sizeof(msgsize)));
-            boost::asio::write(socket, boost::asio::buffer(msg, msgsize));
+            boost::asio::write(socket, boost::asio::buffer(msg, msg->size));
         } 
         catch (std::exception& e)
         {
