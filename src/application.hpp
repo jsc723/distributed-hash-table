@@ -66,33 +66,11 @@ public:
 
 private:
 
-    void introduce_self_to_group() {
-        if (memberNode->address == bootstrap_address)
-        {
-            std::cout << "starting up group" << std::endl;
-            memberNode->isAlive = true;
-            add_node(memberNode);
-        }
-        else
-        {
-            //add to group
-        }
-    }
+    void introduce_self_to_group();
 
     bool add_node(boost::shared_ptr<MemberInfo> member);
 
-    void start_accept()
-    {
-        std::cout << "start_accept ---" << std::endl;
-        workflow::pointer new_connection =
-            workflow::create(acceptor_.get_executor().context());
-
-        acceptor_.async_accept(new_connection->socket(),
-                               boost::bind(&application::handle_accept, this, new_connection,
-                                           boost::asio::placeholders::error));
-
-        std::cout << "--- start_accept" << std::endl;
-    }
+    void start_accept();
 
     void handle_accept(workflow::pointer new_connection,
                        const boost::system::error_code &error)
@@ -108,8 +86,13 @@ private:
         std::cout << "--- handle_accept" << std::endl;
     }
 
+    void main_loop(const boost::system::error_code& ec);
+
+    boost::asio::io_context &io_context;
     Address bootstrap_address;
     tcp::acceptor acceptor_;
     boost::shared_ptr<MemberInfo> memberNode;
     vector<boost::shared_ptr<MemberInfo>> members;
+    boost::asio::deadline_timer timer;
+    int joinreq_retry;
 };

@@ -8,3 +8,5 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/asio.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/chrono.hpp>
+#include <boost/thread/thread.hpp> 
