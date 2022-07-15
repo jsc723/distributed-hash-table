@@ -105,4 +105,8 @@ void application::introduce_self_to_group() {
 void application::main_loop(const boost::system::error_code& ec) {
     //TODO
     memberNode->heartbeat++;
+    cout << "heartbeat: " << memberNode->heartbeat << endl;
+    timer.expires_at(timer.expires_at() + boost::posix_time::seconds(2));
+    timer.async_wait(boost::bind(&application::main_loop, this,
+                boost::asio::placeholders::error));
 }
