@@ -137,6 +137,7 @@ void application::introduce_self_to_group() {
             tcp::socket socket(io_context);
             socket.connect(endpoint);
             boost::asio::write(socket, boost::asio::buffer(msg, msg->size));
+            print_bytes(msg, msg->size);
         } 
         catch (std::exception& e)
         {

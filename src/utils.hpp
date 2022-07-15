@@ -72,3 +72,16 @@ inline std::string make_daytime_string()
   time_t now = time(0);
   return ctime(&now);
 }
+
+inline void print_bytes(void *ptr, int size) 
+{
+    unsigned char *p = (unsigned char *) ptr;
+    int i;
+    for (i=0; i<size; i++) {
+        if(i > 0 && i%4 == 0) {
+          printf("  ");
+        }
+        printf("%02hhX ", p[i]);
+    }
+    printf("\n");
+}

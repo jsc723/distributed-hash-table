@@ -14,11 +14,8 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
         cout << "did not read the num of bytes to transfer" << endl;
         return;
     }
-    buffer.commit(bytes_transferred);
-    string packet_sz_s;
     std::istream is(&buffer);
-    is >> packet_sz_s;
-    Mem::read((char *)packet_sz_s.c_str(), packet_sz);
+    is.read((char*)&packet_sz, sizeof(packet_sz));
     cout << "packet sz is " << packet_sz << endl;
     if (packet_sz > MAX_PACKET_SZ || packet_sz < sizeof(packet_sz)) { 
         cout << "packer size is invalid: " << packet_sz << endl;
@@ -41,11 +38,11 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
                 << ", transferred = " << bytes_transferred << endl;
         return;
     }
-    buffer.commit(bytes_transferred);
     MessageHdr *msg = (MessageHdr *)malloc(packet_sz);
     std::istream is(&buffer);
     msg->size = packet_sz;
     is.read((char*)&(msg->msgType), bytes_transferred);
+    print_bytes(msg, msg->size);
     size_t actual = is.gcount();
     if (actual != bytes_transferred) {
         cout << "failed to read the whole packet, actual = " << actual << endl;
