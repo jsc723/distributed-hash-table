@@ -29,8 +29,8 @@ char *Serializer::decodeAddress(char *mem, Address &addr) {
     return mem;
 }
 	
-MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, long heartbeat, size_t &msgSize) {
-    size_t addr_sz = sizeof(int) + sizeof(short);
+MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
+    uint32_t addr_sz = sizeof(int) + sizeof(short);
     msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->msgType = JOINREQ;
@@ -41,19 +41,19 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     p = Mem::write(p, heartbeat);
     return msg;
 }
-void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, long &heartbeat) {
+void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
     auto p = (char *)(msg+1);
     p = decodeAddress(p, addr);
     p = Mem::read(p, id);
     p = Mem::read(p, ring_id);
     p = Mem::read(p, heartbeat);
 }
-// MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst, size_t &msgSize) {
-//     const size_t entrySize = sizeof(MemberInfo::id) 
+// MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst, uint32_t &msgSize) {
+//     const uint32_t entrySize = sizeof(MemberInfo::id) 
 //                             + sizeof(MemberInfo::port)
 //                             + sizeof(MemberInfo::heartbeat) 
 //                             + sizeof(MemberInfo::timestamp);//4,2,8,8
-//     size_t lstSize = sizeof(size_t) + lst.size() * entrySize;
+//     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
 //     msgSize = sizeof(MessageHdr) + lstSize;
 //     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
 //     msg->msgType = AD;
@@ -81,7 +81,7 @@ void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id,
 //     return p;
 // }
 // char *Serializer::encodeMemberList(char *mem, const vector<MemberInfo> &lst) {
-//     size_t sz = lst.size();
+//     uint32_t sz = lst.size();
 //     auto p = mem;
 //     p = Mem::write(p, sz);
 //     for(auto &e: lst) {
@@ -90,9 +90,9 @@ void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id,
 //     return p;
 // }
 // char *Serializer::decodeMemberList(char *mem, vector<MemberInfo> &lst) {
-//     size_t sz;
+//     uint32_t sz;
 //     auto p = Mem::read(mem, sz);
-//     for(size_t i = 0; i < sz; i++) {
+//     for(uint32_t i = 0; i < sz; i++) {
 //         MemberInfo e;
 //         p = decodeMemberInfo(p, e);
 //         lst.emplace_back(move(e));

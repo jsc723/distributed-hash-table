@@ -1,98 +1,74 @@
 #pragma once 
 #include "headers.hpp"
 #include "utils.hpp"
+#include "serializer.hpp"
 
 using boost::asio::ip::tcp;
 using std::string;
 using std::vector;
 using boost::shared_ptr;
 
-class workflow
-    : public boost::enable_shared_from_this<workflow>
-{
-public:
-    static int next_id;
-    int id;
-    typedef boost::shared_ptr<workflow> pointer;
+class application;
 
-    static pointer create(boost::asio::io_context &io_context)
+class packet_receiver : public boost::enable_shared_from_this<packet_receiver> {
+public:
+    typedef boost::shared_ptr<packet_receiver> pointer;
+    static pointer create(boost::asio::io_context &io_context, application &app)
     {
-        auto conn = new workflow(io_context);
-        std::cout << "tcp connection is created" << conn->id << std::endl;
+        auto conn = new packet_receiver(io_context, app);
         return pointer(conn);
     }
 
-    tcp::socket &socket()
-    {
-        return socket_;
+    void start(); //read packet size
+    shared_ptr<tcp::socket> get_socket() {
+        return socket;
     }
-
-    void start()
-    {
-        message_ = make_daytime_string();
-
-        boost::asio::async_write(socket_, boost::asio::buffer(message_),
-                                boost::bind(&workflow::handle_write, shared_from_this(),
-                                boost::asio::placeholders::error,
-                                boost::asio::placeholders::bytes_transferred));
-    }
-
-    ~workflow()
-    {
-        std::cout << "tcp connect " << id << " freed" << std::endl;
-    }
-
 private:
-    workflow(boost::asio::io_context &io_context)
-        : socket_(io_context), id(next_id++)
-    {
-    }
+    application &app_;
+    packet_receiver(boost::asio::io_context &io_context, application &app)
+        : socket(new tcp::socket(io_context)), packet_sz(0), app_(app)
+        {}
+    void read_packet(const boost::system::error_code & ec/*error*/,
+                      size_t bytes_transferred/*bytes_read*/);
 
-    void handle_write(const boost::system::error_code & /*error*/,
-                      size_t /*bytes_transferred*/)
-    {
-        std::cout << "response is written to the client" << std::endl;
-    }
-
-    tcp::socket socket_;
-    std::string message_;
+    void finish_read(const boost::system::error_code & ec,
+                      size_t bytes_transferred);
+    shared_ptr<tcp::socket> socket;
+    boost::asio::streambuf buffer;
+    uint32_t packet_sz;
 };
-
 
 class application
 {
 public:
     application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id);
 
-private:
+
 
     void introduce_self_to_group();
-
-    bool add_node(boost::shared_ptr<MemberInfo> member);
-
     void start_accept();
-
-    void handle_accept(workflow::pointer new_connection,
-                       const boost::system::error_code &error)
-    {
-        std::cout << "handle_accept --- " << std::endl;
-        if (!error)
-        {
-            std::cout << new_connection->id << " handles request " << std::endl;
-            new_connection->start();
-        }
-
-        start_accept();
-        std::cout << "--- handle_accept" << std::endl;
-    }
-
+    void handle_accept(packet_receiver::pointer new_connection,
+                       const boost::system::error_code &error);
     void main_loop(const boost::system::error_code& ec);
 
+    bool add_node(const MemberInfo &member);
+    void update(const MemberInfo &info);
+    void update(const vector<MemberInfo> &info_list);
+
+    bool memberListEntryIsValid(const MemberInfo &e) {
+		auto time_diff = get_local_time() - e.timestamp;
+        return time_diff.total_seconds() < MyConst::timeoutFail;
+	}
+
+    MemberInfo &self_info() {
+        return members[0];
+    }
+private:
     boost::asio::io_context &io_context;
     Address bootstrap_address;
     tcp::acceptor acceptor_;
-    boost::shared_ptr<MemberInfo> memberNode;
-    vector<boost::shared_ptr<MemberInfo>> members;
+    
+    vector<MemberInfo> members;
     boost::asio::deadline_timer timer;
     int joinreq_retry;
 };
