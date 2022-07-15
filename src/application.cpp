@@ -51,16 +51,20 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     switch(msg->msgType) {
         case JOINREQ: {
             cout << "JOINREQ message received" << endl;
-            MemberInfo m;
-            Serializer::Message::decodeJOINREQ(msg, m.address, m.id, m.ring_id, m.heartbeat);
-            m.isAlive = true;
-            app_.update(m);
-            
+            auto handler = joinreq_handler::create(msg, app, socket);
         } break;
         default: {
             cout << "Unknown messaged type received" << endl;
         }
     }
+}
+
+joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket)
+: app(app), socket(socket) {
+    MemberInfo m;
+    Serializer::Message::decodeJOINREQ(msg, m.address, m.id, m.ring_id, m.heartbeat);
+    m.isAlive = true;
+    app.update(m);
 }
 
 application::application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id)

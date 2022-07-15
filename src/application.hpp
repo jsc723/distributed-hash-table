@@ -24,9 +24,9 @@ public:
         return socket;
     }
 private:
-    application &app_;
+    application &app;
     packet_receiver(boost::asio::io_context &io_context, application &app)
-        : socket(new tcp::socket(io_context)), packet_sz(0), app_(app)
+        : socket(new tcp::socket(io_context)), packet_sz(0), app(app)
         {}
     void read_packet(const boost::system::error_code & ec/*error*/,
                       size_t bytes_transferred/*bytes_read*/);
@@ -36,6 +36,21 @@ private:
     shared_ptr<tcp::socket> socket;
     boost::asio::streambuf buffer;
     uint32_t packet_sz;
+};
+
+class joinreq_handler: public boost::enable_shared_from_this<joinreq_handler> {
+public:
+    typedef boost::shared_ptr<joinreq_handler> pointer;
+    shared_ptr<tcp::socket> socket;
+
+    static pointer create(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket) {
+        return pointer(new joinreq_handler(msg, app, socket));
+    }
+
+private:
+    joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket);
+    application &app;
+    boost::asio::streambuf buffer;
 };
 
 class application

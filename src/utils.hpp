@@ -61,9 +61,9 @@ enum MsgTypes{
     DUMMYLASTMSGTYPE
 };
 
-typedef struct MessageHdr {
+struct MessageHdr {
 	enum MsgTypes msgType;
-}MessageHdr;
+};
 
 inline std::string make_daytime_string()
 {
