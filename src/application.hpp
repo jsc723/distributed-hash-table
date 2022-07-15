@@ -23,6 +23,9 @@ public:
     shared_ptr<tcp::socket> get_socket() {
         return socket;
     }
+    ~packet_receiver() {
+        cout << "packet_receiver released" << endl;
+    }
 private:
     application &app;
     packet_receiver(boost::asio::io_context &io_context, application &app)
@@ -46,9 +49,20 @@ public:
     static pointer create(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket) {
         return pointer(new joinreq_handler(msg, app, socket));
     }
+    void start();
+    void after_write() {
+        cout << "joinreq response is sent" << endl;
+        Serializer::Message::dealloc(response);
+    }
+    ~joinreq_handler() {
+        cout << "joinreq is released" << endl;
+    }
 
 private:
     joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket);
+
+    MessageHdr *response;
+    uint32_t response_sz;
     application &app;
     boost::asio::streambuf buffer;
 };
@@ -57,7 +71,6 @@ class application
 {
 public:
     application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id);
-
 
 
     void introduce_self_to_group();
@@ -69,6 +82,9 @@ public:
     bool add_node(const MemberInfo &member);
     void update(const MemberInfo &info);
     void update(const vector<MemberInfo> &info_list);
+
+    vector<MemberInfo> getValidMembers();
+    vector<Address> sampleNodes(int k);
 
     bool memberListEntryIsValid(const MemberInfo &e) {
 		auto time_diff = get_local_time() - e.timestamp;

@@ -2,70 +2,6 @@
 #include "application.hpp"
 #include "serializer.hpp"
 
-void packet_receiver::start()
-{
-    boost::asio::async_read(*socket, buffer, boost::asio::transfer_exactly(sizeof(uint32_t)),
-                            boost::bind(&packet_receiver::read_packet, shared_from_this(),
-                            boost::asio::placeholders::error,
-                            boost::asio::placeholders::bytes_transferred));
-}
-
-void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
-{
-    if (ec || bytes_transferred != sizeof(uint32_t)) {
-        cout << "did not read the num of bytes to transfer" << endl;
-        return;
-    }
-    buffer.commit(sizeof(uint32_t));
-    string packet_sz_s;
-    std::istream is(&buffer);
-    is >> packet_sz_s;
-    Mem::read((char *)packet_sz_s.c_str(), packet_sz);
-    cout << "packet sz is " << packet_sz << endl;
-    if (packet_sz > MAX_PACKET_SZ) {
-        cout << "packet is too large" << endl;
-        return;
-    }
-    boost::asio::async_read(*socket, buffer, boost::asio::transfer_exactly(packet_sz),
-                            boost::bind(&packet_receiver::finish_read, shared_from_this(),
-                            boost::asio::placeholders::error,
-                            boost::asio::placeholders::bytes_transferred));
-}
-
-void packet_receiver::finish_read(const boost::system::error_code & ec, size_t bytes_transferred)
-{
-    if (ec) {
-        cout << "error: " << ec.message() << endl;
-        return;
-    }
-    if (bytes_transferred != packet_sz) {
-        cout << "did not read the whole packet, packet_sz = " << packet_sz
-                << ", transferred = " << bytes_transferred << endl;
-        return;
-    }
-    buffer.commit(packet_sz);
-    string content;
-    std::istream is(&buffer);
-    is >> content;
-    MessageHdr *msg = (MessageHdr *)content.c_str();
-    switch(msg->msgType) {
-        case JOINREQ: {
-            cout << "JOINREQ message received" << endl;
-            auto handler = joinreq_handler::create(msg, app, socket);
-        } break;
-        default: {
-            cout << "Unknown messaged type received" << endl;
-        }
-    }
-}
-
-joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket)
-: app(app), socket(socket) {
-    MemberInfo m;
-    Serializer::Message::decodeJOINREQ(msg, m.address, m.id, m.ring_id, m.heartbeat);
-    m.isAlive = true;
-    app.update(m);
-}
 
 application::application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id)
         : io_context(io_context), acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
@@ -144,6 +80,38 @@ bool application::add_node(const MemberInfo &member) {
     members.emplace_back(member);
     return true;
 }
+
+vector<MemberInfo> application::getValidMembers() 
+{
+    vector<MemberInfo> validNodes;
+    for(auto &e: members) {
+        if (memberListEntryIsValid(e)) {
+            validNodes.emplace_back(e);
+        }
+    }
+    return validNodes;
+}
+
+vector<Address> application::sampleNodes(int k) {
+    vector<MemberInfo> validNodes;
+    for(auto &e: members) {
+        if (e == self_info()) {
+            continue;
+        }
+        if (memberListEntryIsValid(e)) {
+            validNodes.emplace_back(e);
+        }
+    }
+    k = std::min<int>(k, validNodes.size());
+    vector<MemberInfo> shuffled(validNodes);
+    std::random_shuffle(shuffled.begin(), shuffled.end());
+    vector<Address> sampled(k);
+    for(int i = 0; i < k; i++) {
+        sampled[i] = shuffled[i].address;
+    }
+    return sampled;
+}
+
 
 void application::introduce_self_to_group() {
     MemberInfo &self = self_info();
