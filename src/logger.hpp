@@ -46,7 +46,7 @@ struct Logger {
 };
 extern Logger logger;
 
-class Logable {
+class Loggable {
 public:
   void critical(const char *format, ...) {
         va_list arglist; va_start( arglist, format );

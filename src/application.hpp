@@ -16,7 +16,7 @@ class packet_receiver;
 ------------------------- Application ---------------------------------
 */
 
-class application : public Logable
+class application : public Loggable
 {
 public:
     typedef ba::deadline_timer timer_t;
@@ -30,6 +30,7 @@ public:
     void start_accept();
     void handle_accept(shared_ptr<packet_receiver> new_connection,
                        const boost::system::error_code &error);
+    void dispatch_packet(shared_ptr<tcp::socket> socket, MessageHdr *msg);
 
     void repeating_task_template(const boost::system::error_code& ec, int timer_idx,
                          task_callback_t callback, duration_t interval);

@@ -14,16 +14,16 @@ void packet_receiver::start()
 void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec || bytes_transferred != sizeof(uint32_t)) {
-        app.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
+        log.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
         if (ec) {
-            app.info("error: %s", ec.message().c_str());
+            log.info("error: %s", ec.message().c_str());
         }
         return;
     }
     std::istream is(&buffer);
     is.read((char*)&packet_sz, sizeof(packet_sz));
     if (packet_sz > MAX_PACKET_SZ || packet_sz < sizeof(packet_sz)) { 
-        app.important("packet size is invalid: %u", packet_sz);
+        log.important("packet size is invalid: %u", packet_sz);
         return;
     }
     ba::async_read(*socket, buffer, ba::transfer_exactly(packet_sz - sizeof(packet_sz)),
@@ -35,11 +35,11 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
 void packet_receiver::finish_read(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec) {
-        app.info("error: %s", ec.message().c_str());
+        log.info("error: %s", ec.message().c_str());
         return;
     }
     if (bytes_transferred != packet_sz - sizeof(packet_sz)) {
-        app.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
+        log.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
         return;
     }
     MessageHdr *msg = (MessageHdr *)malloc(packet_sz);
@@ -48,27 +48,12 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     is.read((char*)&(msg->msgType), bytes_transferred);
     size_t actual = is.gcount();
     if (actual != bytes_transferred) {
-        app.info("failed to read the whole packet, actual = %u", actual);
+        log.info("failed to read the whole packet, actual = %u", actual);
         return;
     }
     if (callback) {
         callback(msg);
         return;
-    }
-    switch(msg->msgType) {
-        case JOINREQ: {
-            app.info("JOINREQ message received");
-            auto handler = joinreq_handler::create(msg, app, socket);
-            handler->start();
-        } break;
-        case AD: {
-            app.info("AD message received");
-            auto handler = ad_handler::create(app, msg);
-            handler->start();
-        } break;
-        default: {
-            app.info("Unknown messaged type received");
-        }
     }
 }
 /* ------------------------------- joinreq -------------------------------------*/
@@ -107,10 +92,9 @@ void joinreq_client::start() {
             ba::ip::address(app.get_bootstrap_address().ip), app.get_bootstrap_address().port);
         socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
         socket->connect(endpoint);
-        auto packet_recv = packet_receiver::create(app, socket);
-        packet_recv->set_callback(bind(
-            &joinreq_client::handle_response, shared_from_this(),
-            boost::placeholders::_1
+        auto packet_recv = packet_receiver::create(app, socket, 
+            bind(&joinreq_client::handle_response, shared_from_this(),
+                 boost::placeholders::_1
         ));
         ba::async_write(*socket, ba::buffer(msg, msg->size),
                 bind(&joinreq_client::handle_write, shared_from_this(),

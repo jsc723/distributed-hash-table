@@ -22,20 +22,13 @@ public:
     static int nextId;
     int id;
     typedef boost::function<void(MessageHdr *)> callback_t;
-    void set_callback(callback_t cb) {
-        callback = cb;
-    }
     void start(); //read packet size
     shared_ptr<tcp::socket> get_socket() {
         return socket;
     }
 protected:
-    application &app;
-    packet_receiver(application &app)
-        : socket(new tcp::socket(app.get_context())), packet_sz(0), app(app), id(nextId++)
-        {}
-    packet_receiver(application &app, shared_ptr<tcp::socket> socket)
-    : socket(socket), packet_sz(0), app(app),  id(nextId++)
+    packet_receiver(Loggable &log, shared_ptr<tcp::socket> socket, callback_t cb)
+        : log(log), socket(socket), callback(cb), packet_sz(0), id(nextId++)
         {}
     void read_packet(const boost::system::error_code & ec/*error*/,
                       size_t bytes_transferred/*bytes_read*/);
@@ -43,6 +36,7 @@ protected:
     void finish_read(const boost::system::error_code & ec,
                       size_t bytes_transferred);
 
+    Loggable &log;
     callback_t callback;
     shared_ptr<tcp::socket> socket;
     boost::asio::streambuf buffer;

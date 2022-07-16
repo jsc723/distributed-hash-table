@@ -42,24 +42,42 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 
 void application::start_accept()
 {
-    packet_receiver::pointer new_connection = packet_receiver::create(*this);
+    auto socket = shared_ptr<tcp::socket>(new tcp::socket(io_context));
+    packet_receiver::pointer packet_recv = packet_receiver::create(*this,
+        socket, bind(&application::dispatch_packet, this, socket, boost::placeholders::_1));
 
-    acceptor_.async_accept(*new_connection->get_socket(),
-                            boost::bind(&application::handle_accept, this, new_connection,
+    acceptor_.async_accept(*socket, boost::bind(&application::handle_accept, this, packet_recv,
                                         boost::asio::placeholders::error));
 
 }
 
-void application::handle_accept(packet_receiver::pointer new_connection,
+void application::handle_accept(packet_receiver::pointer packet_recv,
                     const boost::system::error_code &error)
 {
     if (!error)
     {
         info("handle request");
-        new_connection->start();
+        packet_recv->start();
     }
-
     start_accept();
+}
+
+void application::dispatch_packet(shared_ptr<tcp::socket> socket, MessageHdr *msg) {
+    switch(msg->msgType) {
+        case JOINREQ: {
+            info("JOINREQ message received");
+            auto handler = joinreq_handler::create(msg, *this, socket);
+            handler->start();
+        } break;
+        case AD: {
+            info("AD message received");
+            auto handler = ad_handler::create(*this, msg);
+            handler->start();
+        } break;
+        default: {
+            info("Unknown messaged type received");
+        }
+    }
 }
 
 void application::update_self() {
