@@ -16,7 +16,7 @@ using boost::shared_ptr;
 typedef boost::posix_time::ptime timestamp_t;
 
 struct MyConst {
-	static const int checkInterval = 1;
+	static const int heartbeatInterval = 1;
 	static const int resendTimeout = 3;
 	static const int GossipInterval = 3;
 	static const int timeoutFail = 20;

@@ -10,6 +10,8 @@ using boost::shared_ptr;
 
 class application;
 
+/* ------------------------------- packet receiver -------------------------------------*/
+
 class packet_receiver : public boost::enable_shared_from_this<packet_receiver> {
 public:
     typedef boost::shared_ptr<packet_receiver> pointer;
@@ -55,6 +57,11 @@ private:
     boost::asio::streambuf buffer;
     uint32_t packet_sz;
 };
+
+
+/*
+ -------------------------- joinreq ----------------------------
+*/
 
 class joinreq_handler: public boost::enable_shared_from_this<joinreq_handler> {
 public:
@@ -109,9 +116,17 @@ private:
     int joinreq_retry;
 };
 
+/*
+------------------------- Application ---------------------------------
+*/
+
 class application
 {
 public:
+    typedef boost::asio::deadline_timer timer_t;
+    typedef boost::function<void()> task_callback_t;
+    typedef boost::posix_time::time_duration duration_t;
+
     application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id);
 
 
@@ -119,11 +134,19 @@ public:
     void start_accept();
     void handle_accept(packet_receiver::pointer new_connection,
                        const boost::system::error_code &error);
-    void main_loop(const boost::system::error_code& ec);
+
+    void repeating_task_template(const boost::system::error_code& ec, int timer_idx,
+                         task_callback_t callback, duration_t interval);
+
+    void heartbeat_loop();
+
+    void add_repeating_task(task_callback_t callback, duration_t interval);
+    void ad_loop();
 
     bool add_node(const MemberInfo &member);
     void update(const MemberInfo &info);
     void update(const vector<MemberInfo> &info_list);
+
 
     vector<MemberInfo> getValidMembers();
     vector<Address> sampleNodes(int k);
@@ -148,5 +171,5 @@ private:
     tcp::acceptor acceptor_;
     
     vector<MemberInfo> members;
-    boost::asio::deadline_timer timer;
+    vector<boost::asio::deadline_timer> timers;
 };

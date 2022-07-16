@@ -159,6 +159,9 @@ void joinreq_client::handle_write(const boost::system::error_code & ec, size_t b
 }
 
 void joinreq_client::handle_response(MessageHdr *msg) {
-    printf("heared back from the group!\n");
+    printf("heared back from the group, set self to alive\n");
+    vector<MemberInfo> adlst;
+    Serializer::Message::decodeAD(msg, adlst);
     app.self_info().isAlive = true;
+    app.update(adlst);
 }

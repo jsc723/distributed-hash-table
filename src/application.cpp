@@ -4,8 +4,7 @@
 
 
 application::application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id)
-        : io_context(io_context), acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
-        timer(io_context, boost::posix_time::seconds(1))
+        : io_context(io_context), acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
 {
     boost::system::error_code ec;
     Address address;
@@ -24,8 +23,8 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
     members.emplace_back(self);
 
     introduce_self_to_group();
-    timer.async_wait(boost::bind(&application::main_loop, this,
-                boost::asio::placeholders::error));
+    add_repeating_task(boost::bind(&application::heartbeat_loop, this), 
+        boost::posix_time::seconds(MyConst::heartbeatInterval));
     start_accept();
 }
 
@@ -125,56 +124,42 @@ void application::introduce_self_to_group() {
         //add to group
         auto joinreq = joinreq_client::create(*this);
         joinreq->start();
-        // uint32_t msgsize;
-        // MessageHdr *msg = Serializer::Message::allocEncodeJOINREQ(
-        //     self.address, self.id, self.ring_id, self.heartbeat, msgsize);
-
-        // cout << "Trying to join..." << endl;
-
-        // send JOINREQ message to introducer member
-        // bool success = true;
-        // try {
-        //     tcp::resolver resolver(io_context);
-        //     boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address(bootstrap_address.ip), bootstrap_address.port);
-        //     tcp::socket socket(io_context);
-        //     socket.connect(endpoint);
-        //     boost::asio::write(socket, boost::asio::buffer(msg, msg->size));
-        //     print_bytes(msg, msg->size);
-        // } 
-        // catch (std::exception& e)
-        // {
-        //     std::cerr << e.what() << std::endl;
-        //     success = false;
-        // }
-        // Serializer::Message::dealloc(msg);
-
-        // if (!success) {
-        //     if (joinreq_retry++ < 5) {
-        //         cout << "cannot join the group, retry later ..." << endl;
-        //         boost::this_thread::sleep_for(boost::chrono::seconds(5 * joinreq_retry));
-        //         introduce_self_to_group();
-        //     }
-        //     else {
-        //         cout << "failed to join the group" << endl;
-        //         exit(1);
-        //     }
-        // }
-        // cout << "join request is sent" << endl;
     }
 }
 
-void application::main_loop(const boost::system::error_code& ec) {
-    //TODO
+void application::add_repeating_task(task_callback_t callback, duration_t interval) {
+    timers.emplace_back(get_context(), interval);
+    int timer_idx = timers.size() - 1;
+    timers[timer_idx].async_wait(boost::bind(&application::repeating_task_template,
+        this, boost::asio::placeholders::error, timer_idx, callback, interval));
+}
+
+void application::repeating_task_template(const boost::system::error_code& ec, int timer_idx, 
+                                        task_callback_t callback, duration_t interval) {
     MemberInfo &self = self_info();
+    if (ec) {
+        cout << ec.message() << endl;
+        goto end_template_loop;
+    }
     if (!self.isAlive) {
         cout << "waiting to become alive" << endl;
-        goto end_main_loop;
+        goto end_template_loop;
     }
+
+    callback();
+
+end_template_loop:
+    timers[timer_idx].expires_at(timers[timer_idx].expires_at() + interval);
+    timers[timer_idx].async_wait(boost::bind(&application::repeating_task_template,
+        this, boost::asio::placeholders::error, timer_idx, callback, interval));
+}
+
+void application::heartbeat_loop() {
+    MemberInfo &self = self_info();
     self.heartbeat++;
     cout << "heartbeat: " << self.heartbeat << endl;
+}
 
-end_main_loop:
-    timer.expires_at(timer.expires_at() + boost::posix_time::seconds(2));
-    timer.async_wait(boost::bind(&application::main_loop, this,
-                boost::asio::placeholders::error));
+void application::ad_loop() {
+    cout << "send ad" << endl;
 }
