@@ -1,5 +1,6 @@
 #include "headers.hpp"
 #include "application.hpp"
+#include "protocol.hpp"
 #include "serializer.hpp"
 
 
@@ -23,8 +24,16 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
     members.emplace_back(self);
 
     introduce_self_to_group();
+
+    // ----------------------------- repeating tasks ------------------------------//
+
     add_repeating_task(boost::bind(&application::heartbeat_loop, this), 
         boost::posix_time::seconds(MyConst::heartbeatInterval));
+
+    add_repeating_task(bind(&application::ad_loop, this),
+        boost::posix_time::seconds(MyConst::GossipInterval));
+
+    // -----------------------------------------------------------------------------//
     start_accept();
 }
 
@@ -55,12 +64,18 @@ void application::handle_accept(packet_receiver::pointer new_connection,
     std::cout << "--- handle_accept" << std::endl;
 }
 
+void application::update_self() {
+    self_info().heartbeat++;
+    self_info().timestamp = get_local_time();
+}
+
 void application::update(const MemberInfo &info) {
     for(auto &e: members) {
         if (e == info) {
             if (memberListEntryIsValid(e) && e.heartbeat < info.heartbeat) {
                 e.heartbeat = info.heartbeat;
                 e.timestamp = get_local_time();
+                printf("update node %d, heartbeat = %d\n", e.id, e.heartbeat);
             }
             return;
         }
@@ -156,10 +171,12 @@ end_template_loop:
 
 void application::heartbeat_loop() {
     MemberInfo &self = self_info();
-    self.heartbeat++;
+    update_self();
     cout << "heartbeat: " << self.heartbeat << endl;
 }
 
 void application::ad_loop() {
     cout << "send ad" << endl;
+    auto sender = ad_sender::create(*this);
+    sender->start();
 }

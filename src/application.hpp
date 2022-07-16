@@ -9,112 +9,7 @@ using std::vector;
 using boost::shared_ptr;
 
 class application;
-
-/* ------------------------------- packet receiver -------------------------------------*/
-
-class packet_receiver : public boost::enable_shared_from_this<packet_receiver> {
-public:
-    typedef boost::shared_ptr<packet_receiver> pointer;
-    typedef boost::function<void(MessageHdr *)> callback_t;
-    static pointer create(boost::asio::io_context &io_context, application &app)
-    {
-        auto conn = new packet_receiver(io_context, app);
-        return pointer(conn);
-    }
-    static pointer create(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
-    {
-        auto conn = new packet_receiver(io_context, app, socket);
-        return pointer(conn);
-    }
-
-    void set_callback(callback_t cb) {
-        callback = cb;
-    }
-
-    void start(); //read packet size
-    shared_ptr<tcp::socket> get_socket() {
-        return socket;
-    }
-    ~packet_receiver() {
-        cout << "packet_receiver released" << endl;
-    }
-private:
-    application &app;
-    packet_receiver(boost::asio::io_context &io_context, application &app)
-        : socket(new tcp::socket(io_context)), packet_sz(0), app(app)
-        {}
-    packet_receiver(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
-    : socket(socket), packet_sz(0), app(app)
-    {}
-    void read_packet(const boost::system::error_code & ec/*error*/,
-                      size_t bytes_transferred/*bytes_read*/);
-
-    void finish_read(const boost::system::error_code & ec,
-                      size_t bytes_transferred);
-
-    callback_t callback;
-    shared_ptr<tcp::socket> socket;
-    boost::asio::streambuf buffer;
-    uint32_t packet_sz;
-};
-
-
-/*
- -------------------------- joinreq ----------------------------
-*/
-
-class joinreq_handler: public boost::enable_shared_from_this<joinreq_handler> {
-public:
-    typedef boost::shared_ptr<joinreq_handler> pointer;
-    shared_ptr<tcp::socket> socket;
-
-    static pointer create(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket) {
-        return pointer(new joinreq_handler(msg, app, socket));
-    }
-    void start();
-    void after_write() {
-        cout << "joinreq response is sent" << endl;
-        Serializer::Message::dealloc(response);
-    }
-    ~joinreq_handler() {
-        cout << "joinreq is released" << endl;
-    }
-
-private:
-    joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket);
-
-    MessageHdr *response;
-    uint32_t response_sz;
-    application &app;
-    boost::asio::streambuf buffer;
-};
-
-class joinreq_client: public boost::enable_shared_from_this<joinreq_client> {
-public:
-    typedef boost::shared_ptr<joinreq_client> pointer;
-    shared_ptr<tcp::socket> socket;
-
-    static pointer create(application &app) {
-        return pointer(new joinreq_client(app));
-    }
-    void start();
-    void handle_write(const boost::system::error_code & ec,
-                      size_t bytes_transferred, packet_receiver::pointer pr);
-    void handle_response(MessageHdr *msg);
-    ~joinreq_client() {
-        cout << "joinreq client is released" << endl;
-        Serializer::Message::dealloc(msg);
-    }
-
-private:
-    joinreq_client(application &app);
-
-    application &app;
-    boost::asio::streambuf buffer;
-    MessageHdr *msg;
-    boost::asio::deadline_timer timer;
-    int joinreq_retry;
-};
+class packet_receiver;
 
 /*
 ------------------------- Application ---------------------------------
@@ -132,7 +27,7 @@ public:
 
     void introduce_self_to_group();
     void start_accept();
-    void handle_accept(packet_receiver::pointer new_connection,
+    void handle_accept(shared_ptr<packet_receiver> new_connection,
                        const boost::system::error_code &error);
 
     void repeating_task_template(const boost::system::error_code& ec, int timer_idx,
@@ -144,6 +39,7 @@ public:
     void ad_loop();
 
     bool add_node(const MemberInfo &member);
+    void update_self();
     void update(const MemberInfo &info);
     void update(const vector<MemberInfo> &info_list);
 

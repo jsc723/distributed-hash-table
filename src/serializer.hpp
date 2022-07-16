@@ -12,7 +12,7 @@ struct Serializer {
 	struct Message {
 		static MessageHdr *allocEncodeJOINREQ(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
 		static void decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat);
-		static MessageHdr *allocEncodeAD(const vector<MemberInfo> &lst, uint32_t &msgSize);
+		static MessageHdr *allocEncodeAD(const vector<MemberInfo> &lst);
 		static void decodeAD(MessageHdr *msg, vector<MemberInfo> &lst);
 		static void dealloc(MessageHdr *msg) {
 			free(msg);

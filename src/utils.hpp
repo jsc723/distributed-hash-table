@@ -12,6 +12,9 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using boost::shared_ptr;
+using boost::bind;
+namespace ba = boost::asio;
+namespace bpt = boost::posix_time;
 
 typedef boost::posix_time::ptime timestamp_t;
 
@@ -22,10 +25,18 @@ struct MyConst {
 	static const int timeoutFail = 20;
 	static const int timeoutRemove = 45;
 	static const int GossipFan = 3;
+  static const int joinreq_retry_max = 5;
+  static const int joinreq_retry_factor = 5;
 };
 
 inline timestamp_t get_local_time() {
-  return boost::posix_time::second_clock::local_time();
+  return bpt::second_clock::local_time();
+}
+
+inline string time_to_string(timestamp_t t) {
+  std::stringstream ss;
+  ss << t.time_of_day().minutes() << ":" << t.time_of_day().seconds();
+  return ss.str();
 }
 
 struct Address {

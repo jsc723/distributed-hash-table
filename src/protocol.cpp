@@ -1,5 +1,8 @@
 #include "application.hpp"
+#include "protocol.hpp"
 
+/* ------------------------------- packet receiver -------------------------------------*/
+int packet_receiver::nextId = 0;
 void packet_receiver::start()
 {
     boost::asio::async_read(*socket, buffer, boost::asio::transfer_exactly(sizeof(uint32_t)),
@@ -64,12 +67,15 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
         } break;
         case AD: {
             cout << "AD message received" << endl;
+            auto handler = ad_handler::create(app, msg);
+            handler->start();
         } break;
         default: {
             cout << "Unknown messaged type received" << endl;
         }
     }
 }
+/* ------------------------------- joinreq -------------------------------------*/
 
 joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket)
 : app(app), socket(socket) {
@@ -83,9 +89,9 @@ void joinreq_handler::start() {
     //send an AD
     auto validMembers = app.getValidMembers();
     cout << "begin encode" << endl;
-    response = Serializer::Message::allocEncodeAD(validMembers, response_sz);
-    cout << "end encode, response_sz = " << response_sz << endl;
-    boost::asio::async_write(*socket, boost::asio::buffer(response, response_sz),
+    response = Serializer::Message::allocEncodeAD(validMembers);
+    cout << "end encode, response_sz = " << response->size << endl;
+    boost::asio::async_write(*socket, boost::asio::buffer(response, response->size),
                             boost::bind(&joinreq_handler::after_write, shared_from_this()));
 }
 
@@ -103,7 +109,6 @@ void joinreq_client::start() {
     //send JOINREQ message to introducer member
     bool success = true;
     try {
-        tcp::resolver resolver(app.get_context());
         boost::asio::ip::tcp::endpoint endpoint(
             boost::asio::ip::address(app.get_bootstrap_address().ip), app.get_bootstrap_address().port);
         socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
@@ -128,9 +133,9 @@ void joinreq_client::start() {
         success = false;
     }
     if (!success) {
-        if (joinreq_retry++ < 5) {
+        if (joinreq_retry++ < MyConst::joinreq_retry_max) {
             cout << "cannot join the group, retry later ..." << endl;
-            timer.expires_from_now(boost::posix_time::seconds(5 * joinreq_retry));
+            timer.expires_from_now(boost::posix_time::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
             timer.async_wait(boost::bind(&joinreq_client::start, shared_from_this()));
         }
         else {
@@ -144,9 +149,9 @@ void joinreq_client::start() {
 void joinreq_client::handle_write(const boost::system::error_code & ec, size_t bytes_transferred,
     packet_receiver::pointer pr) {
     if (ec || bytes_transferred != msg->size) {
-        if (joinreq_retry++ < 5) {
+        if (joinreq_retry++ < MyConst::joinreq_retry_max) {
             cout << "cannot join the group, retry later ..." << endl;
-            timer.expires_from_now(boost::posix_time::seconds(5 * joinreq_retry));
+            timer.expires_from_now(boost::posix_time::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
             timer.async_wait(boost::bind(&joinreq_client::start, shared_from_this()));
         }
         else {
@@ -163,5 +168,50 @@ void joinreq_client::handle_response(MessageHdr *msg) {
     vector<MemberInfo> adlst;
     Serializer::Message::decodeAD(msg, adlst);
     app.self_info().isAlive = true;
+    app.update(adlst);
+}
+
+
+/* ------------------------------- ad  -------------------------------------*/
+ad_sender::ad_sender(application &app)
+    :app(app)
+{
+    auto validEntries = app.getValidMembers();
+    msg = Serializer::Message::allocEncodeAD(validEntries);
+}
+
+void ad_sender::start() {
+    auto sampled_addr = app.sampleNodes(MyConst::GossipFan);
+    for(auto &addr: sampled_addr) {
+        cout << "send ad to node port = " << addr.port << endl;
+        async_connect_send(addr);
+    }
+}
+void ad_sender::async_connect_send(const Address &addr) {
+    try {
+        ba::ip::tcp::endpoint endpoint(ba::ip::address(addr.ip), addr.port);
+        auto socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
+        socket->async_connect(endpoint, bind(&ad_sender::async_send, shared_from_this(),
+            socket));
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+}
+void ad_sender::async_send(shared_ptr<tcp::socket> socket) {
+    try {
+        ba::async_write(*socket, ba::buffer(msg, msg->size), 
+            bind(&ad_sender::after_send, shared_from_this(), socket));
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+void ad_handler::start() {
+    vector<MemberInfo> adlst;
+    Serializer::Message::decodeAD(msg, adlst);
     app.update(adlst);
 }

@@ -49,14 +49,14 @@ void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id,
     p = Mem::read(p, ring_id);
     p = Mem::read(p, heartbeat);
 }
-MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst, uint32_t &msgSize) {
+MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     const uint32_t entrySize = addr_sz
                             + sizeof(MemberInfo::id) 
                             + sizeof(MemberInfo::ring_id)
                             + sizeof(MemberInfo::heartbeat);
     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
-    msgSize = sizeof(MessageHdr) + lstSize;
+    uint32_t msgSize = sizeof(MessageHdr) + lstSize;
     printf("addr_sz=%d, entry_sz=%d, lst_sz=%d, msg_sz=%d\n", addr_sz, entrySize, lstSize, msgSize);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
