@@ -2,6 +2,7 @@
 #include "headers.hpp"
 #include "utils.hpp"
 #include "serializer.hpp"
+#include "data_store.hpp"
 
 using ba::ip::tcp;
 using std::string;
@@ -68,6 +69,10 @@ public:
     Address get_bootstrap_address() {
         return bootstrap_address;
     }
+    data_store &get_store() {
+        return store;
+    }
+    int map_key_to_node_idx(const data_store::key_t &key);
 private:
     ba::io_context &io_context;
     Address bootstrap_address;
@@ -75,4 +80,5 @@ private:
     
     vector<MemberInfo> members;
     vector<ba::deadline_timer> timers;
+    data_store store;
 };

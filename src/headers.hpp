@@ -2,6 +2,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <tuple>
 #include <algorithm>
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
@@ -11,3 +15,5 @@
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp> 
 #include <boost/function.hpp>
+#include <boost/uuid/detail/md5.hpp>
+#include <boost/algorithm/hex.hpp>

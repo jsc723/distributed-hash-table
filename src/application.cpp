@@ -204,3 +204,22 @@ void application::check_member_loop() {
     }
     members = move(updated);
 }
+
+//--------------------------------------------------------
+
+int application::map_key_to_node_idx(const data_store::key_t &key) {
+    int ring_pos = md5_mod(key);
+    size_t best_node_idx = 0;
+    int min_diff = INT_MAX;
+    for(size_t i = 0; i < members.size(); i++) {
+        int ring_id = members[i].ring_id;
+        if (ring_id < ring_pos) {
+            ring_id += MyConst::ring_size;
+        }
+        if (ring_id - ring_pos < min_diff) {
+            min_diff = ring_id - ring_pos;
+            best_node_idx = i;
+        }
+    }
+    return best_node_idx;
+}

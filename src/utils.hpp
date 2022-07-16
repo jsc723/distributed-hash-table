@@ -8,6 +8,9 @@
 
 using std::string;
 using std::vector;
+using std::unordered_map;
+using std::pair;
+using std::tuple;
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -28,6 +31,7 @@ struct MyConst {
   static const int check_memebr_interval = 5;
   static const int joinreq_retry_max = 5;
   static const int joinreq_retry_factor = 5;
+  static const uint32_t ring_size = 1 << 16;
 };
 
 inline timestamp_t get_local_time() {
@@ -38,6 +42,18 @@ inline string time_to_string(timestamp_t t) {
   std::stringstream ss;
   ss << t.time_of_day().minutes() << ":" << t.time_of_day().seconds();
   return ss.str();
+}
+
+inline int md5_mod(string s, int mod = MyConst::ring_size) {
+  using boost::uuids::detail::md5;
+  md5 hash;
+  md5::digest_type digest;
+
+  hash.process_bytes(s.data(), s.size());
+  hash.get_digest(digest);
+  const int *p = (const int *) &digest;
+  int last_32_bits = p[3];
+  return last_32_bits % mod;
 }
 
 struct Address {

@@ -1,5 +1,8 @@
 obj/
 bin/
 debug/
+refs/
+logs/
+.vscode
 *.o
 *.gch
