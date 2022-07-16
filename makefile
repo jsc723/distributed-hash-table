@@ -10,6 +10,8 @@ BIN_PATH := bin
 OBJ_PATH := obj
 SRC_PATH := src
 DBG_PATH := debug
+CLIENT_SRC_PATH := src/client
+CLIENT_OBJ_PATH := obj/client
 
 # compile macros
 TARGET_NAME := dh# FILL: target name
@@ -18,11 +20,15 @@ ifeq ($(OS),Windows_NT)
 endif
 TARGET := $(BIN_PATH)/$(TARGET_NAME)
 TARGET_DEBUG := $(DBG_PATH)/$(TARGET_NAME)
+CLIENT_TARGET := $(BIN_PATH)/client
 
 # src files & obj files
 SRC := $(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
 OBJ := $(addprefix $(OBJ_PATH)/, $(addsuffix .o, $(notdir $(basename $(SRC)))))
 OBJ_DEBUG := $(addprefix $(DBG_PATH)/, $(addsuffix .o, $(notdir $(basename $(SRC)))))
+
+CLIENT_SRC := $(foreach x, $(CLIENT_SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
+CLIENT_OBJ := $(addprefix $(CLIENT_OBJ_PATH)/, $(addsuffix .o, $(notdir $(basename $(CLIENT_SRC)))))
 
 PCH_SRC = $(SRC_PATH)/headers.hpp
 PCH_OUT = $(SRC_PATH)/headers.hpp.gch
@@ -32,6 +38,7 @@ DISTCLEAN_LIST := $(OBJ) \
                   $(OBJ_DEBUG)
 CLEAN_LIST := $(TARGET) \
 			  $(TARGET_DEBUG) \
+			  $(CLIENT_TARGET) \
 			  $(DISTCLEAN_LIST)
 
 # default rule
@@ -53,14 +60,20 @@ $(TARGET_DEBUG): $(OBJ_DEBUG)
 $(PCH_OUT): $(PCH_SRC)
 	$(CC) $(CCFLAGS) -o $@ $<
 
-.PHONY: headers
-headers:
-	$(CC) $(CCFLAGS) $(PCH_SRC)
+$(CLIENT_TARGET): $(CLIENT_OBJ)
+	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) $(LIBRA)
+
+$(CLIENT_OBJ_PATH)/%.o: $(SRC_PATH)/%.c* $(PCH_OUT)
+	$(CC) $(CCOBJFLAGS) -H -include $(PCH_SRC) -c -o $@ $<
+
+.PHONY: client
+client: $(CLIENT_TARGET)
+	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) $(LIBRA)
 
 # phony rules
 .PHONY: makedir
 makedir:
-	@mkdir -p $(BIN_PATH) $(OBJ_PATH) $(DBG_PATH)
+	@mkdir -p $(BIN_PATH) $(OBJ_PATH) $(DBG_PATH) $(CLIENT_SRC_PATH) $(CLIENT_OBJ_PATH)
 
 .PHONY: all
 all: $(TARGET)
