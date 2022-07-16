@@ -40,8 +40,7 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 void application::start_accept()
 {
     std::cout << "start_accept ---" << std::endl;
-    packet_receiver::pointer new_connection =
-        packet_receiver::create(io_context, *this);
+    packet_receiver::pointer new_connection = packet_receiver::create(*this);
 
     acceptor_.async_accept(*new_connection->get_socket(),
                             boost::bind(&application::handle_accept, this, new_connection,

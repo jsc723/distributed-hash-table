@@ -1,46 +1,42 @@
 #pragma once
 #include "application.hpp"
 
+// ------------------------------- protocol base ---------------------------------------//
+template<class T>
+class protocol_base : public boost::enable_shared_from_this<T> {
+public:
+    typedef boost::shared_ptr<T> pointer;
+    template <typename ... Args>
+    static pointer create(Args&& ... args){
+        return pointer(new T(std::forward<Args>(args)...));
+    }
+
+protected:
+};
+
 /* ------------------------------- packet receiver -------------------------------------*/
 
-class packet_receiver : public boost::enable_shared_from_this<packet_receiver> {
+class packet_receiver : public protocol_base<packet_receiver> {
 public:
+    friend class protocol_base<packet_receiver>;
     static int nextId;
     int id;
-    typedef boost::shared_ptr<packet_receiver> pointer;
     typedef boost::function<void(MessageHdr *)> callback_t;
-    static pointer create(boost::asio::io_context &io_context, application &app)
-    {
-        auto conn = new packet_receiver(io_context, app);
-        printf("packet_receiver %d created\n", conn->id);
-        return pointer(conn);
-    }
-    static pointer create(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
-    {
-        auto conn = new packet_receiver(io_context, app, socket);
-        printf("packet_receiver %d created\n", conn->id);
-        return pointer(conn);
-    }
-
     void set_callback(callback_t cb) {
         callback = cb;
     }
-
     void start(); //read packet size
     shared_ptr<tcp::socket> get_socket() {
         return socket;
     }
-    ~packet_receiver() {
-        printf("packet_receiver %d released\n", id);
-    }
-private:
+protected:
     application &app;
-    packet_receiver(boost::asio::io_context &io_context, application &app)
-        : socket(new tcp::socket(io_context)), packet_sz(0), app(app), id(nextId++)
+    packet_receiver(application &app)
+        : socket(new tcp::socket(app.get_context())), packet_sz(0), app(app), id(nextId++)
         {}
-    packet_receiver(boost::asio::io_context &io_context, application &app, shared_ptr<tcp::socket> socket)
+    packet_receiver(application &app, shared_ptr<tcp::socket> socket)
     : socket(socket), packet_sz(0), app(app),  id(nextId++)
-    {}
+        {}
     void read_packet(const boost::system::error_code & ec/*error*/,
                       size_t bytes_transferred/*bytes_read*/);
 
@@ -53,19 +49,13 @@ private:
     uint32_t packet_sz;
 };
 
-
 /*
  -------------------------- joinreq ----------------------------
 */
 
-class joinreq_handler: public boost::enable_shared_from_this<joinreq_handler> {
+class joinreq_handler: public protocol_base<joinreq_handler> {
 public:
-    typedef boost::shared_ptr<joinreq_handler> pointer;
-    shared_ptr<tcp::socket> socket;
-
-    static pointer create(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket) {
-        return pointer(new joinreq_handler(msg, app, socket));
-    }
+    friend class protocol_base<joinreq_handler>;
     void start();
     void after_write() {
         cout << "joinreq response is sent" << endl;
@@ -75,22 +65,17 @@ public:
         cout << "joinreq is released" << endl;
     }
 
-private:
+protected:
     joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket);
-
+    shared_ptr<tcp::socket> socket;
     MessageHdr *response;
     application &app;
     boost::asio::streambuf buffer;
 };
 
-class joinreq_client: public boost::enable_shared_from_this<joinreq_client> {
+class joinreq_client: public protocol_base<joinreq_client> {
 public:
-    typedef boost::shared_ptr<joinreq_client> pointer;
-    shared_ptr<tcp::socket> socket;
-
-    static pointer create(application &app) {
-        return pointer(new joinreq_client(app));
-    }
+    friend class protocol_base<joinreq_client>;
     void start();
     void handle_write(const boost::system::error_code & ec,
                       size_t bytes_transferred, packet_receiver::pointer pr);
@@ -100,9 +85,9 @@ public:
         Serializer::Message::dealloc(msg);
     }
 
-private:
+protected:
     joinreq_client(application &app);
-
+    shared_ptr<tcp::socket> socket;
     application &app;
     boost::asio::streambuf buffer;
     MessageHdr *msg;
@@ -111,19 +96,15 @@ private:
 };
 
 
-class ad_sender: public boost::enable_shared_from_this<ad_sender> {
+class ad_sender: public protocol_base<ad_sender> {
 public:
-    typedef boost::shared_ptr<ad_sender> pointer;
-
-    static pointer create(application &app) {
-        return pointer(new ad_sender(app));
-    }
+    friend class protocol_base<ad_sender>;
     void start();
     ~ad_sender() {
         Serializer::Message::dealloc(msg);
     }
 
-private:
+protected:
     ad_sender(application &app);
 
     void async_connect_send(const Address &addr);
@@ -132,24 +113,19 @@ private:
         //need to hold a pointer to socket otherwise it is destroied
         cout << "ad is sent" << endl;
     }
-
     MessageHdr *msg;
     application &app;
 };
 
-class ad_handler : public boost::enable_shared_from_this<ad_handler> {
+class ad_handler : public protocol_base<ad_handler> {
 public:
-    typedef shared_ptr<ad_handler> pointer;
-
-    static pointer create(application &app, MessageHdr *msg) {
-        return pointer(new ad_handler(app, msg));
-    }
+    friend class protocol_base<ad_handler>;
     void start();
     ~ad_handler() {
         Serializer::Message::dealloc(msg);
     }
 
-private:
+protected:
     ad_handler(application &app, MessageHdr *msg):
         app(app), msg(msg) {}
     MessageHdr *msg;

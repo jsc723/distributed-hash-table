@@ -113,7 +113,7 @@ void joinreq_client::start() {
             boost::asio::ip::address(app.get_bootstrap_address().ip), app.get_bootstrap_address().port);
         socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
         socket->connect(endpoint);
-        auto packet_recv = packet_receiver::create(app.get_context(), app, socket);
+        auto packet_recv = packet_receiver::create(app, socket);
         packet_recv->set_callback(boost::bind(
             &joinreq_client::handle_response, shared_from_this(),
             boost::placeholders::_1
@@ -124,8 +124,6 @@ void joinreq_client::start() {
                     boost::asio::placeholders::bytes_transferred,
                     packet_recv
                 ));
-        
-        
     } 
     catch (std::exception& e)
     {
@@ -191,8 +189,7 @@ void ad_sender::async_connect_send(const Address &addr) {
     try {
         ba::ip::tcp::endpoint endpoint(ba::ip::address(addr.ip), addr.port);
         auto socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
-        socket->async_connect(endpoint, bind(&ad_sender::async_send, shared_from_this(),
-            socket));
+        socket->async_connect(endpoint, bind(&ad_sender::async_send, shared_from_this(), socket));
     }
     catch (std::exception& e)
     {
