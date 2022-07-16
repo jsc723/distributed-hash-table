@@ -12,7 +12,7 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
     address.ip = boost::asio::ip::make_address_v4(LOCALHOST, ec);
     if (ec)
     {
-        std::cerr << "unable to resolve ip address" << std::endl;
+        critical("unable to resolve ip address");
         exit(1);
     }
     address.port = port;
@@ -42,28 +42,24 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 
 void application::start_accept()
 {
-    std::cout << "start_accept ---" << std::endl;
     packet_receiver::pointer new_connection = packet_receiver::create(*this);
 
     acceptor_.async_accept(*new_connection->get_socket(),
                             boost::bind(&application::handle_accept, this, new_connection,
                                         boost::asio::placeholders::error));
 
-    std::cout << "--- start_accept" << std::endl;
 }
 
 void application::handle_accept(packet_receiver::pointer new_connection,
                     const boost::system::error_code &error)
 {
-    std::cout << "handle_accept --- " << std::endl;
     if (!error)
     {
-        std::cout << " handles request " << std::endl;
+        info("handle request");
         new_connection->start();
     }
 
     start_accept();
-    std::cout << "--- handle_accept" << std::endl;
 }
 
 void application::update_self() {
@@ -73,17 +69,14 @@ void application::update_self() {
 
 void application::update(const MemberInfo &info, bool forced) {
     if (forced) {
-        printf("forced update for joinreq \n");
+        debug("Forced update for joinreq");
     }
     for(auto &e: members) {
         if (e == info) {
             if ((memberListEntryIsValid(e) && e.heartbeat < info.heartbeat )|| forced) {
-                if (!memberListEntryIsValid(e) && forced) {
-                    printf("forced update for node %d\n", e.id);
-                }
                 e.heartbeat = info.heartbeat;
                 e.timestamp = get_local_time();
-                printf("update node %d, heartbeat = %d\n", e.id, e.heartbeat);
+                debug("update node %d, heartbeat = %d", e.id, e.heartbeat);
             }
             return;
         }
@@ -98,7 +91,7 @@ void application::update(const vector<MemberInfo> &info_list) {
 }
 
 bool application::add_node(const MemberInfo &member) {
-    cout << "add node: " << member.id  << ", port: " << member.address.port << endl;
+    info("Add node: %d, Port: %hu", member.id, member.address.port);
     members.emplace_back(member);
     return true;
 }
@@ -139,7 +132,7 @@ void application::introduce_self_to_group() {
     MemberInfo &self = self_info();
     if (self.address == bootstrap_address)
     {
-        std::cout << "starting up group" << std::endl;
+        info("Starting up group");
         self.isAlive = true;
     }
     else
@@ -161,11 +154,11 @@ void application::repeating_task_template(const boost::system::error_code& ec, i
                                         task_callback_t callback, duration_t interval) {
     MemberInfo &self = self_info();
     if (ec) {
-        cout << ec.message() << endl;
+        info("%s", ec.message().c_str());
         goto end_template_loop;
     }
     if (!self.isAlive) {
-        cout << "waiting to become alive" << endl;
+        info("Waiting to become alive...");
         goto end_template_loop;
     }
 
@@ -180,11 +173,10 @@ end_template_loop:
 void application::heartbeat_loop() {
     MemberInfo &self = self_info();
     update_self();
-    cout << "heartbeat: " << self.heartbeat << endl;
 }
 
 void application::ad_loop() {
-    cout << "send ad" << endl;
+    debug("Send AD");
     auto sender = ad_sender::create(*this);
     sender->start();
 }
@@ -196,7 +188,7 @@ void application::check_member_loop() {
         auto &e = members[i];
         if (!memberListEntryIsValid(e) && e.isAlive) {
             e.isAlive = false;
-            printf("[%d] node %d left the group\n", self_info().id, e.id);
+            info("node %d left the group", self_info().id, e.id);
         }
         if (!memberListEntryShouldBeRemoved(e)) {
             updated.emplace_back(e);

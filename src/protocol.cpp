@@ -14,18 +14,16 @@ void packet_receiver::start()
 void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec || bytes_transferred != sizeof(uint32_t)) {
-        cout << "did not read the num of bytes to transfer, bytes transfered = " 
-        << bytes_transferred << endl;
+        app.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
         if (ec) {
-            cout << ec.message() << endl;
+            app.info("error: %s", ec.message().c_str());
         }
         return;
     }
     std::istream is(&buffer);
     is.read((char*)&packet_sz, sizeof(packet_sz));
-    cout << "packet sz is " << packet_sz << endl;
     if (packet_sz > MAX_PACKET_SZ || packet_sz < sizeof(packet_sz)) { 
-        cout << "packer size is invalid: " << packet_sz << endl;
+        app.important("packet size is invalid: %u", packet_sz);
         return;
     }
     ba::async_read(*socket, buffer, ba::transfer_exactly(packet_sz - sizeof(packet_sz)),
@@ -37,12 +35,11 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
 void packet_receiver::finish_read(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec) {
-        cout << "error: " << ec.message() << endl;
+        app.info("error: %s", ec.message().c_str());
         return;
     }
     if (bytes_transferred != packet_sz - sizeof(packet_sz)) {
-        cout << "did not read the whole packet, packet_sz = " << packet_sz
-                << ", transferred = " << bytes_transferred << endl;
+        app.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
         return;
     }
     MessageHdr *msg = (MessageHdr *)malloc(packet_sz);
@@ -51,7 +48,7 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     is.read((char*)&(msg->msgType), bytes_transferred);
     size_t actual = is.gcount();
     if (actual != bytes_transferred) {
-        cout << "failed to read the whole packet, actual = " << actual << endl;
+        app.info("failed to read the whole packet, actual = %u", actual);
         return;
     }
     if (callback) {
@@ -60,17 +57,17 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     }
     switch(msg->msgType) {
         case JOINREQ: {
-            cout << "JOINREQ message received" << endl;
+            app.info("JOINREQ message received");
             auto handler = joinreq_handler::create(msg, app, socket);
             handler->start();
         } break;
         case AD: {
-            cout << "AD message received" << endl;
+            app.info("AD message received");
             auto handler = ad_handler::create(app, msg);
             handler->start();
         } break;
         default: {
-            cout << "Unknown messaged type received" << endl;
+            app.info("Unknown messaged type received");
         }
     }
 }
@@ -87,9 +84,7 @@ joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_ptr<t
 void joinreq_handler::start() {
     //send an AD
     auto validMembers = app.getValidMembers();
-    cout << "begin encode" << endl;
     response = Serializer::Message::allocEncodeAD(validMembers);
-    cout << "end encode, response_sz = " << response->size << endl;
     ba::async_write(*socket, ba::buffer(response, response->size),
                             bind(&joinreq_handler::after_write, shared_from_this()));
 }
@@ -103,7 +98,7 @@ joinreq_client::joinreq_client(application &app)
 }
 
 void joinreq_client::start() {
-    cout << "Trying to join..." << endl;
+    app.info("Trying to join...");
 
     //send JOINREQ message to introducer member
     bool success = true;
@@ -126,17 +121,17 @@ void joinreq_client::start() {
     } 
     catch (std::exception& e)
     {
-        std::cerr << e.what() << std::endl;
+        app.info(e.what());
         success = false;
     }
     if (!success) {
         if (joinreq_retry++ < MyConst::joinreq_retry_max) {
-            cout << "cannot join the group, retry later ..." << endl;
+            app.info("cannot join the group, retry later ...");
             timer.expires_from_now(bpt::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
             timer.async_wait(bind(&joinreq_client::start, shared_from_this()));
         }
         else {
-            cout << "failed to join the group" << endl;
+            app.info("failed to join the group");
             exit(1);
         }
     }
@@ -147,12 +142,12 @@ void joinreq_client::handle_write(const boost::system::error_code & ec, size_t b
     packet_receiver::pointer pr) {
     if (ec || bytes_transferred != msg->size) {
         if (joinreq_retry++ < MyConst::joinreq_retry_max) {
-            cout << "cannot join the group, retry later ..." << endl;
+            app.info("cannot join the group, retry later ...");
             timer.expires_from_now(bpt::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
             timer.async_wait(bind(&joinreq_client::start, shared_from_this()));
         }
         else {
-            cout << "failed to join the group" << endl;
+            app.info("failed to join the group");
             exit(1);
         }
     }
@@ -160,7 +155,7 @@ void joinreq_client::handle_write(const boost::system::error_code & ec, size_t b
 }
 
 void joinreq_client::handle_response(MessageHdr *msg) {
-    printf("heared back from the group, set self to alive\n");
+    app.info("heared back from the group, set self to alive");
     vector<MemberInfo> adlst;
     Serializer::Message::decodeAD(msg, adlst);
     app.self_info().isAlive = true;
@@ -179,7 +174,7 @@ ad_sender::ad_sender(application &app)
 void ad_sender::start() {
     auto sampled_addr = app.sampleNodes(MyConst::GossipFan);
     for(auto &addr: sampled_addr) {
-        cout << "send ad to node port = " << addr.port << endl;
+        app.info("send ad to node port = %d", addr.port);
         async_connect_send(addr);
     }
 }
@@ -191,7 +186,7 @@ void ad_sender::async_connect_send(const Address &addr) {
     }
     catch (std::exception& e)
     {
-        std::cerr << e.what() << std::endl;
+        app.info("%s", e.what());
     }
 }
 void ad_sender::async_send(shared_ptr<tcp::socket> socket) {
@@ -201,7 +196,7 @@ void ad_sender::async_send(shared_ptr<tcp::socket> socket) {
     }
     catch (std::exception& e)
     {
-        std::cerr << e.what() << std::endl;
+        app.info("%s", e.what());
     }
 }
 

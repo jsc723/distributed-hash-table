@@ -57,7 +57,6 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
                             + sizeof(MemberInfo::heartbeat);
     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
     uint32_t msgSize = sizeof(MessageHdr) + lstSize;
-    printf("addr_sz=%d, entry_sz=%d, lst_sz=%d, msg_sz=%d\n", addr_sz, entrySize, lstSize, msgSize);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
     msg->msgType = AD;

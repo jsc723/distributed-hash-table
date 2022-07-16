@@ -1,5 +1,6 @@
 #pragma once
 #include "headers.hpp"
+#include "logger.hpp"
 #define LOCALHOST "127.0.0.1"
 #define BOOTSTRAP_IP LOCALHOST
 #define BOOTSTRAP_PORT 9000
@@ -11,9 +12,6 @@ using std::vector;
 using std::unordered_map;
 using std::pair;
 using std::tuple;
-using std::cout;
-using std::cerr;
-using std::endl;
 using boost::shared_ptr;
 using boost::bind;
 namespace ba = boost::asio;

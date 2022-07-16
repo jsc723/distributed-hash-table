@@ -1,4 +1,6 @@
 #include <ctime>
+#include <cstdio>
+#include <stdarg.h>
 #include <iostream>
 #include <string>
 #include <vector>

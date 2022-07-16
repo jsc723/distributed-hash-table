@@ -1,6 +1,5 @@
 #include "headers.hpp"
 #include "utils.hpp"
-#include "printer.hpp"
 #include "application.hpp"
 
 using boost::asio::ip::tcp;
@@ -8,14 +7,16 @@ using std::string;
 using std::vector;
 using boost::shared_ptr;
 
+Logger logger;
 
 int main(int argc, char *argv[])
 {
+    logger.set_log_level(LogLevel::DEBUG);
     try
     {
         if (argc != 4)
         {
-            std::cerr << "Usage: dh <id> <port> <ring_id>" << std::endl;
+            std::cout << "Usage: dh <id> <port> <ring_id>" << std::endl;
             return 1;
         }
         int id = boost::lexical_cast<int>(argv[1]);
@@ -27,7 +28,7 @@ int main(int argc, char *argv[])
     }
     catch (std::exception &e)
     {
-        std::cerr << e.what() << std::endl;
+        logger.log(LogLevel::CRITICAL, "", e.what());
     }
 
     return 0;

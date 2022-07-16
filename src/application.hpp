@@ -16,7 +16,7 @@ class packet_receiver;
 ------------------------- Application ---------------------------------
 */
 
-class application
+class application : public Logable
 {
 public:
     typedef ba::deadline_timer timer_t;
@@ -73,6 +73,11 @@ public:
         return store;
     }
     int map_key_to_node_idx(const data_store::key_t &key);
+
+    virtual void vlog(LogLevel level, const char *format, va_list args){
+        sprintf(prefix_buf, "[id=%d][h=%d] ", self_info().id, self_info().heartbeat);
+        logger.vlog(level, prefix_buf, format, args);
+    }
 private:
     ba::io_context &io_context;
     Address bootstrap_address;
@@ -81,4 +86,5 @@ private:
     vector<MemberInfo> members;
     vector<ba::deadline_timer> timers;
     data_store store;
+    char prefix_buf[1024];
 };

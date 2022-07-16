@@ -58,11 +58,11 @@ public:
     friend class protocol_base<joinreq_handler>;
     void start();
     void after_write() {
-        cout << "joinreq response is sent" << endl;
+        app.debug("joinreq response is sent");
         Serializer::Message::dealloc(response);
     }
     ~joinreq_handler() {
-        cout << "joinreq is released" << endl;
+        app.debug("joinreq is released");
     }
 
 protected:
@@ -81,7 +81,6 @@ public:
                       size_t bytes_transferred, packet_receiver::pointer pr);
     void handle_response(MessageHdr *msg);
     ~joinreq_client() {
-        cout << "joinreq client is released" << endl;
         Serializer::Message::dealloc(msg);
     }
 
@@ -111,7 +110,7 @@ protected:
     void async_send(shared_ptr<tcp::socket> socket);
     void after_send(shared_ptr<tcp::socket> socket) {
         //need to hold a pointer to socket otherwise it is destroied
-        cout << "ad is sent" << endl;
+        app.debug("AD is sent");
     }
     MessageHdr *msg;
     application &app;
