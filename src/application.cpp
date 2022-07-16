@@ -27,11 +27,14 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 
     // ----------------------------- repeating tasks ------------------------------//
 
-    add_repeating_task(boost::bind(&application::heartbeat_loop, this), 
-        boost::posix_time::seconds(MyConst::heartbeatInterval));
+    add_repeating_task(bind(&application::heartbeat_loop, this), 
+        bpt::seconds(MyConst::heartbeatInterval));
 
     add_repeating_task(bind(&application::ad_loop, this),
-        boost::posix_time::seconds(MyConst::GossipInterval));
+        bpt::seconds(MyConst::GossipInterval));
+
+    add_repeating_task(bind(&application::check_member_loop, this),
+        bpt::seconds(MyConst::check_memebr_interval));
 
     // -----------------------------------------------------------------------------//
     start_accept();
@@ -68,10 +71,16 @@ void application::update_self() {
     self_info().timestamp = get_local_time();
 }
 
-void application::update(const MemberInfo &info) {
+void application::update(const MemberInfo &info, bool forced) {
+    if (forced) {
+        printf("forced update for joinreq \n");
+    }
     for(auto &e: members) {
         if (e == info) {
-            if (memberListEntryIsValid(e) && e.heartbeat < info.heartbeat) {
+            if ((memberListEntryIsValid(e) && e.heartbeat < info.heartbeat )|| forced) {
+                if (!memberListEntryIsValid(e) && forced) {
+                    printf("forced update for node %d\n", e.id);
+                }
                 e.heartbeat = info.heartbeat;
                 e.timestamp = get_local_time();
                 printf("update node %d, heartbeat = %d\n", e.id, e.heartbeat);
@@ -178,4 +187,20 @@ void application::ad_loop() {
     cout << "send ad" << endl;
     auto sender = ad_sender::create(*this);
     sender->start();
+}
+
+void application::check_member_loop() {
+    vector<MemberInfo> updated;
+    updated.emplace_back(self_info());
+    for(size_t i = 1; i < members.size(); i++) {
+        auto &e = members[i];
+        if (!memberListEntryIsValid(e) && e.isAlive) {
+            e.isAlive = false;
+            printf("[%d] node %d left the group\n", self_info().id, e.id);
+        }
+        if (!memberListEntryShouldBeRemoved(e)) {
+            updated.emplace_back(e);
+        }
+    }
+    members = move(updated);
 }

@@ -22,9 +22,10 @@ struct MyConst {
 	static const int heartbeatInterval = 1;
 	static const int resendTimeout = 3;
 	static const int GossipInterval = 3;
-	static const int timeoutFail = 20;
-	static const int timeoutRemove = 45;
+	static const int timeoutFail = 15;
+	static const int timeoutRemove = 30;
 	static const int GossipFan = 3;
+  static const int check_memebr_interval = 5;
   static const int joinreq_retry_max = 5;
   static const int joinreq_retry_factor = 5;
 };
