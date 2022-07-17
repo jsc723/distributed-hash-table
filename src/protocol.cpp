@@ -208,9 +208,8 @@ void set_handler::start() {
     response.set_success(true);
     response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
 
-    auto prc = packet_receiver::create(app, socket, bind(&application::dispatch_packet,
-        &app, socket, boost::placeholders::_1));
     ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
-        bind(&set_handler::after_response, shared_from_this(), prc)
+        bind(&set_handler::after_response, shared_from_this(), 
+            packet_receiver::create_dispatcher(app, socket))
     );
 }

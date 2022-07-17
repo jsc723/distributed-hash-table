@@ -43,10 +43,9 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 void application::start_accept()
 {
     auto socket = shared_socket(new tcp::socket(io_context));
-    packet_receiver::pointer packet_recv = packet_receiver::create(*this,
-        socket, bind(&application::dispatch_packet, this, socket, boost::placeholders::_1));
+    auto prc = packet_receiver::create_dispatcher(*this, socket);
 
-    acceptor_.async_accept(*socket, boost::bind(&application::handle_accept, this, packet_recv,
+    acceptor_.async_accept(*socket, boost::bind(&application::handle_accept, this, prc,
                                         boost::asio::placeholders::error));
 
 }

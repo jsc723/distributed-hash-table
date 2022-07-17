@@ -14,7 +14,7 @@ CLIENT_SRC_PATH := src/client
 CLIENT_OBJ_PATH := obj/client
 
 # compile macros
-TARGET_NAME := dh# FILL: target name
+TARGET_NAME := dhserver# FILL: target name
 ifeq ($(OS),Windows_NT)
 	TARGET_NAME := $(addsuffix .exe,$(TARGET_NAME))
 endif

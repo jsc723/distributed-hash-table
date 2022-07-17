@@ -26,6 +26,10 @@ public:
     shared_socket get_socket() {
         return socket;
     }
+    static pointer create_dispatcher(application &app, shared_socket socket) {
+        return create(app, socket, bind(&application::dispatch_packet,
+            &app, socket, boost::placeholders::_1));
+    }
 protected:
     packet_receiver(Loggable &log, shared_socket socket, callback_t cb)
         : log(log), socket(socket), callback(cb), packet_sz(0), id(nextId++)
