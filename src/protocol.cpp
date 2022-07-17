@@ -190,16 +190,111 @@ void ad_handler::start() {
 }
 
 // -------------------GET-----------------------------
+get_handler::get_handler(application &app, MessageHdr *msg, shared_socket socket)
+    :app(app), socket(socket), response_msg(nullptr), msg_to_peers(nullptr),
+     responsed_peer_cnt(0), latest_version(0), best_peer_response_idx(0),
+     is_success(false) {
+    request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
+    app.info("set req: key=%s", request.key().c_str());
+    Serializer::Message::dealloc(msg);
+}
+void get_handler::start() {
+    app.debug("handle get request");
+    if (request.sender_id() != -1) {
+        do_execute();
+        return;
+    }
+    do_coordinate();
+}
+
+void get_handler::do_coordinate() {
+    int peer_idx = app.map_key_to_node_idx(request.key());
+    auto peer = app.get_member(peer_idx);
+    app.info("route get request to peer id = %d", peer.id);
+    peers.emplace_back(peer);
+
+    request.set_sender_id(app.self_info().id);
+    msg_to_peers = Serializer::Message::allocEncode(MsgType::SET, request);
+    for(int idx = 0; idx < peers.size(); idx++) {
+        peer_response.emplace_back();
+        try {
+            ba::ip::tcp::endpoint endpoint(ba::ip::address(peers[idx].address.ip), peers[idx].address.port);
+            auto peer_socket = shared_socket(new tcp::socket(app.get_context()));
+            peer_sockets.emplace_back(peer_socket);
+            peer_socket->async_connect(endpoint, 
+                bind(&get_handler::send_req_to_peer, shared_from_this(), idx));
+        }
+        catch (std::exception& e)
+        {
+            app.info("%s", e.what());
+        }
+    }
+}
+
+void get_handler::send_req_to_peer(int idx) {
+    try {
+        auto prc = packet_receiver::create(app, peer_sockets[idx], 
+            bind(&get_handler::read_peer_response, shared_from_this(), 
+            idx, boost::placeholders::_1));
+        
+        ba::async_write(*peer_sockets[idx], ba::buffer(msg_to_peers, msg_to_peers->size),
+            bind(&get_handler::start_prc, shared_from_this(), prc));
+    }
+    catch (std::exception& e)
+    {
+        app.info(e.what());
+    }
+}
+
+void get_handler::start_prc(packet_receiver::pointer prc)
+{
+    prc->start();
+}
+
+void get_handler::read_peer_response(int idx, MessageHdr *msg) {
+    responsed_peer_cnt++;
+    try {
+        auto &res = peer_response[idx];
+        res.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
+        if (res.success() && res.value().version() > latest_version) {
+            is_success = true;
+            latest_version = res.value().version();
+            best_peer_response_idx = idx;
+        }
+        if(responsed_peer_cnt == peers.size()) {
+            if (is_success) {
+                response = peer_response[best_peer_response_idx];
+            } else {
+                response.set_success(false);
+            }
+            response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
+
+            auto prc = packet_receiver::create_dispatcher(app, socket);
+            ba::async_write(*socket, ba::buffer(response_msg, response_msg->size), 
+                bind(&get_handler::start_prc, shared_from_this(), prc)
+            );
+        }
+    }
+    catch (std::exception& e)
+    {
+        app.info(e.what());
+    }
+}
+
+void get_handler::do_execute() {
+
+}
+
 
 // -------------------SET-----------------------------
 
 set_handler::set_handler(application &app, MessageHdr *msg, shared_socket socket)
     :app(app), socket(socket), response_msg(nullptr), request_msg(nullptr),
      responsed_peer_cnt(0) {
-    print_bytes(msg, std::min<int>(100, msg->size));
     request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
     app.info("set req: key=%s, val=%s, version=%ld", 
         request.key().c_str(), request.value().value().c_str(), request.value().version());
+    Serializer::Message::dealloc(msg);
 }
 void set_handler::start() {
     app.debug("handle set request");
@@ -260,13 +355,18 @@ void set_handler::handle_commit() {
     if (commit_from_cood && app.get_store().check_lock(request.key())) {
         app.info("SET %s to %s", request.key().c_str(), request.value().value().c_str());
         app.get_store().set(request.key(), request.value());
-        app.get_store().release(request.key());
         app.info("release lock for %s", request.key().c_str());
         final_response_to_cood = 1;
     } else {
         app.info("SET %s ABORTED", request.key().c_str());
         final_response_to_cood = 0;
     }
+
+    if (app.get_store().check_lock(request.key())) {
+        app.info("release lock for %s", request.key().c_str());
+        app.get_store().release(request.key());
+    }
+    
     ba::async_write(*socket, make_buffer(final_response_to_cood),
         bind(&set_handler::after_final_response, shared_from_this()));
 }
@@ -282,7 +382,7 @@ void set_handler::send_req_to_peer(int idx) {
     }
     catch (std::exception& e)
     {
-        app.info("execute SET");
+        app.info(e.what());
     }
 }
 

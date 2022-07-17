@@ -128,27 +128,10 @@ protected:
     application &app;
 };
 
-//---------------------------GET--------------------------------
-class get_handler : public protocol_base<get_handler> {
-public:
-    friend class protocol_base<get_handler>;
-    void start(){}
-    ~get_handler() {}
-protected:
-    get_handler(application &app)
-    :app(app) {}
-    application &app;
-};
-
 //---------------------------SET--------------------------------
 class set_handler : public protocol_base<set_handler> {
 public:
     friend class protocol_base<set_handler>;
-    typedef boost::function<void(shared_socket socket, MessageHdr *)> callback_t;
-
-    void set_callback(callback_t cb) {
-        callback = cb;
-    }
 
     void start();
     void do_coordinate();
@@ -194,7 +177,50 @@ protected:
     unsigned char response_to_cood;
     unsigned char commit_from_cood;
     unsigned char final_response_to_cood;
-    callback_t callback;
 };
+
+
+class get_handler : public protocol_base<get_handler> {
+public:
+    friend class protocol_base<get_handler>;
+
+    void start();
+
+    void do_coordinate();
+    void send_req_to_peer(int idx);
+    void read_peer_response(int idx, MessageHdr *msg);
+    void start_prc(packet_receiver::pointer prc);
+
+    void do_execute();
+
+    void after_response();
+    ~get_handler() {
+        app.debug("release get_handler");
+        Serializer::Message::dealloc(response_msg);
+        Serializer::Message::dealloc(msg_to_peers);
+    }
+
+protected:
+    get_handler(application &app, MessageHdr *msg, shared_socket socket);
+    shared_socket socket;
+    application &app;
+    dh_message::GetRequest request;
+    MessageHdr *msg_to_peers;
+    dh_message::GetResponse response;
+    MessageHdr *response_msg;
+
+    //coordinator
+    vector<MemberInfo> peers;
+    vector<shared_socket> peer_sockets;
+    int responsed_peer_cnt;
+    vector<dh_message::GetResponse> peer_response;
+    int best_peer_response_idx;
+    uint64_t latest_version;
+    bool is_success;
+
+    //executor
+
+};
+
 
 
