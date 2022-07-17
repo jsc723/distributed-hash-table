@@ -3,7 +3,7 @@ CC := g++ # FILL: the compiler
 CCFLAGS := --std=c++11# FILL: compile flags
 DBGFLAGS := -g
 CCOBJFLAGS := $(CCFLAGS) -c
-LIBRA := -lboost_system -lboost_thread -pthread
+LIBRA := -lboost_system -lboost_thread -pthread -lprotobuf
 
 # path macros
 BIN_PATH := bin
@@ -42,7 +42,7 @@ CLEAN_LIST := $(TARGET) \
 			  $(DISTCLEAN_LIST)
 
 # default rule
-default: makedir all
+default: makedir proto all
 
 # non-phony targets
 $(TARGET): $(OBJ)
@@ -66,6 +66,7 @@ $(CLIENT_TARGET): $(CLIENT_OBJ)
 $(CLIENT_OBJ_PATH)/%.o: $(SRC_PATH)/%.c* $(PCH_OUT)
 	$(CC) $(CCOBJFLAGS) -H -include $(PCH_SRC) -c -o $@ $<
 
+
 .PHONY: client
 client: $(CLIENT_TARGET)
 	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) $(LIBRA)
@@ -74,6 +75,10 @@ client: $(CLIENT_TARGET)
 .PHONY: makedir
 makedir:
 	@mkdir -p $(BIN_PATH) $(OBJ_PATH) $(DBG_PATH) $(CLIENT_SRC_PATH) $(CLIENT_OBJ_PATH)
+
+.PHONY: proto
+proto:
+	protoc -I=$(SRC_PATH) --cpp_out=$(SRC_PATH) $(SRC_PATH)/messages.proto
 
 .PHONY: all
 all: $(TARGET)

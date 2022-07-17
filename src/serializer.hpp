@@ -1,31 +1,7 @@
 #pragma once
 #include "headers.hpp"
 #include "utils.hpp"
-
-namespace pojo 
-{
-	struct get_t {
-		int transaction_id;
-		int sender_id;
-		int ttl;
-		string key;
-	};
-	struct get_response_t {
-		int transaction_id;
-		int sender_id;
-		int responder_id;
-		uint64_t version;
-		string value;
-	};
-	struct set_t {
-		int transaction_id;
-		int sender_id;
-		int ttl;
-		uint64_t version;
-		string key;
-		string value;
-	};
-}
+#include "messages.pb.h"
 
 struct Serializer {
 	static void addressToIpPort(const Address &addr, int &id, unsigned short &port);
@@ -40,8 +16,22 @@ struct Serializer {
 		static void decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat);
 		static MessageHdr *allocEncodeAD(const vector<MemberInfo> &lst);
 		static void decodeAD(MessageHdr *msg, vector<MemberInfo> &lst);
-		static MessageHdr *allocEncodeGET(pojo::get_t data);
-		static void decodeGET(MessageHdr *msg, pojo::get_t &data);
+
+		
+		static MessageHdr *allocEncodeGetRequest(MsgType type, dh_message::GetRequest &req);
+
+		template<typename T>
+		static MessageHdr *allocEncode(MsgType type, T &req) {
+			int data_sz = req.ByteSize();
+			uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
+			MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
+			msg->size = msg_sz;
+			msg->msgType = type;
+			char *payload = (char*)(msg+1);
+			req.SerializeToArray(payload, data_sz);
+			return msg;
+		}
+
 		static void dealloc(MessageHdr *msg) {
 			free(msg);
 		}

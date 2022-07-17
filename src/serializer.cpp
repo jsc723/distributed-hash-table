@@ -54,7 +54,7 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
     msg->msgType = MsgType::JOINREQ;
-    auto p = (char *)(msg+1);
+    auto p = msg->payload;
     p = encodeAddress(p, myaddr);
     p = Mem::write(p, id);
     p = Mem::write(p, ring_id);
@@ -62,7 +62,7 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     return msg;
 }
 void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
-    auto p = (char *)(msg+1);
+    auto p = msg->payload;
     p = decodeAddress(p, addr);
     p = Mem::read(p, id);
     p = Mem::read(p, ring_id);
@@ -79,20 +79,12 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
     msg->msgType = MsgType::AD;
-    encodeMemberList((char *)(msg+1), lst);
+    encodeMemberList(msg->payload, lst);
 
     return msg;
 }
 void Serializer::Message::decodeAD(MessageHdr *msg, vector<MemberInfo> &lst) {
-    decodeMemberList((char *)(msg+1), lst);
-}
-
-MessageHdr *Serializer::Message::allocEncodeGET(pojo::get_t data) {
-    return nullptr;
-}
-
-void Serializer::Message::decodeGET(MessageHdr *msg, pojo::get_t &data) {
-    
+    decodeMemberList(msg->payload, lst);
 }
 
 char *Serializer::encodeMemberInfo(char *mem, const MemberInfo& e) {
@@ -129,4 +121,17 @@ char *Serializer::decodeMemberList(char *mem, vector<MemberInfo> &lst) {
         lst.emplace_back(std::move(e));
     }
     return p;
+}
+
+
+// --------------------------------------
+
+MessageHdr *Serializer::Message::allocEncodeGetRequest(MsgType type, dh_message::GetRequest &req) {
+    int data_sz = req.ByteSize();
+    uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
+    MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
+    msg->size = msg_sz;
+    msg->msgType = type;
+    req.SerializeToArray(&(msg->payload), data_sz);
+    return msg;
 }

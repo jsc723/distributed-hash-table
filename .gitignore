@@ -4,5 +4,6 @@ debug/
 refs/
 logs/
 .vscode
+*.pb.*
 *.o
 *.gch

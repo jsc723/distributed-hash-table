@@ -92,6 +92,7 @@ enum class MsgType{
 struct MessageHdr {
   uint32_t size;
 	enum MsgType msgType;
+  char payload[0];
 };
 
 inline std::string make_daytime_string()
