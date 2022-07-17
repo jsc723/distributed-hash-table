@@ -1,5 +1,4 @@
 #include "../headers.hpp"
-#include "../messages.pb.h"
 #include "../utils.hpp"
 #include "../serializer.hpp"
 #include <boost/array.hpp>

@@ -25,6 +25,8 @@ public:
 
     application(ba::io_context &io_context, int id, unsigned short port, int ring_id);
 
+    void init();
+
 
     void introduce_self_to_group();
     void start_accept();
@@ -62,7 +64,7 @@ public:
 	}
 
     MemberInfo &self_info() {
-        return members[0];
+        return members[self_index];
     }
     ba::io_context & get_context() {
         return io_context;
@@ -84,6 +86,7 @@ private:
     Address bootstrap_address;
     tcp::acceptor acceptor_;
     
+    int self_index;
     vector<MemberInfo> members;
     vector<ba::deadline_timer> timers;
     data_store store;

@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
         int ring_id = boost::lexical_cast<int>(argv[3]);
         boost::asio::io_context io_context;
         application app(io_context, id, port, ring_id);
+        app.init();
         io_context.run();
     }
     catch (std::exception &e)

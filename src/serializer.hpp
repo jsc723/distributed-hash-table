@@ -1,7 +1,6 @@
 #pragma once
 #include "headers.hpp"
 #include "utils.hpp"
-#include "messages.pb.h"
 
 struct Serializer {
 	static void addressToIpPort(const Address &addr, int &id, unsigned short &port);

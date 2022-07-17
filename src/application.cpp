@@ -12,19 +12,22 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
     address.ip = boost::asio::ip::make_address_v4(LOCALHOST, ec);
     if (ec)
     {
-        critical("unable to resolve ip address");
+        logger.log(LogLevel::CRITICAL, "", "unable to resolve ip address");
         exit(1);
     }
     address.port = port;
 
     bootstrap_address.ip = boost::asio::ip::make_address_v4(LOCALHOST, ec);
     bootstrap_address.port = BOOTSTRAP_PORT;
-
     MemberInfo self(address, id, ring_id);
     members.emplace_back(self);
+    self_index = 0;
+    logger.log(LogLevel::DEBUG, "", "app ctor done");
+}
 
+void application::init() {
+    info("---Start application---");
     introduce_self_to_group();
-
     // ----------------------------- repeating tasks ------------------------------//
 
     add_repeating_task(bind(&application::heartbeat_loop, this), 
@@ -122,7 +125,20 @@ void application::update(const vector<MemberInfo> &info_list) {
 
 bool application::add_node(const MemberInfo &member) {
     info("Add node: %d, Port: %hu", member.id, member.address.port);
+    auto self = self_info();
     members.emplace_back(member);
+    sort(members.begin(), members.end(), [](const MemberInfo &p, const MemberInfo &q) {
+        if (p.ring_id == q.ring_id) {
+            return p.id < q.id;
+        }
+        return p.ring_id < q.ring_id;
+    });
+    for(int i = 0; i < members.size(); i++) {
+        if (members[i] == self) {
+            self_index = i;
+            break;
+        }
+    }
     return true;
 }
 
@@ -213,9 +229,15 @@ void application::ad_loop() {
 
 void application::check_member_loop() {
     vector<MemberInfo> updated;
-    updated.emplace_back(self_info());
-    for(size_t i = 1; i < members.size(); i++) {
+    int next_self_index;
+    for(size_t i = 0; i < members.size(); i++) {
         auto &e = members[i];
+        if (i == self_index) {
+            next_self_index = updated.size();
+            updated.emplace_back(e);
+            continue;
+        }
+
         if (!memberListEntryIsValid(e) && e.isAlive) {
             e.isAlive = false;
             info("node %d left the group", self_info().id, e.id);
@@ -225,6 +247,7 @@ void application::check_member_loop() {
         }
     }
     members = move(updated);
+    self_index = next_self_index;
 }
 
 //--------------------------------------------------------
@@ -243,5 +266,7 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
             best_node_idx = i;
         }
     }
+    debug("key=%s, ring_pos=%d, ring_id=%d, id=%d", key.c_str(), ring_pos, 
+        members[best_node_idx].ring_id, members[best_node_idx].id);
     return best_node_idx;
 }

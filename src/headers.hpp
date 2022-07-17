@@ -19,3 +19,4 @@
 #include <boost/function.hpp>
 #include <boost/uuid/detail/md5.hpp>
 #include <boost/algorithm/hex.hpp>
+#include "messages.pb.h"
