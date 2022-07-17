@@ -108,7 +108,6 @@ protected:
     void async_send(shared_socket socket);
     void after_send(shared_socket socket) {
         //need to hold a pointer to socket otherwise it is destroied
-        app.debug("AD is sent");
     }
     MessageHdr *msg;
     application &app;

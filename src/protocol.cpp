@@ -158,7 +158,6 @@ ad_sender::ad_sender(application &app)
 void ad_sender::start() {
     auto sampled_addr = app.sampleNodes(MyConst::GossipFan);
     for(auto &addr: sampled_addr) {
-        app.info("send ad to node port = %d", addr.port);
         async_connect_send(addr);
     }
 }
@@ -204,22 +203,6 @@ set_handler::set_handler(application &app, MessageHdr *msg, shared_socket socket
 }
 void set_handler::start() {
     app.debug("handle set request");
-
-    // may be unnecessary
-    // if (peer == app.self_info()) {
-    //     app.info("handle set request locally");
-    //     app.get_store().set(request.key(), request.value());
-        
-    //     response.set_success(true);
-    //     response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
-
-    //     ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
-    //         bind(&set_handler::after_response, shared_from_this(), 
-    //             packet_receiver::create_dispatcher(app, socket))
-    //     );
-    //     return;
-    // }
-    
     if (request.sender_id() != -1) {
         //SET executer
         do_execute();
@@ -259,23 +242,26 @@ void set_handler::do_execute() {
         //if not or timeout, release lock, close socket
     //if not, response with a single byte = 0x0 (false), don't wait for lock
     if (app.get_store().lock(request.key())) {
+        app.debug("got the lock for %s", request.key().c_str());
         response_to_cood = 1;
     } else {
+        app.debug("unable to get lock for %s" , request.key().c_str());
         response_to_cood = 0;
-        ba::async_write(*socket, ba::buffer(&response_to_cood, sizeof(response_to_cood)),
-                bind(&set_handler::read_commit, shared_from_this()));
-        
     }
+    ba::async_write(*socket, ba::buffer(&response_to_cood, sizeof(response_to_cood)),
+        bind(&set_handler::read_commit, shared_from_this()));
 }
 void set_handler::read_commit() {
     ba::async_read(*socket, ba::buffer(&commit_from_cood, sizeof(commit_from_cood)),
         bind(&set_handler::handle_commit, shared_from_this()));
 }
 void set_handler::handle_commit() {
+    app.debug("got commit message = %d", (int)commit_from_cood);
     if (commit_from_cood && app.get_store().check_lock(request.key())) {
         app.info("SET %s to %s", request.key().c_str(), request.value().value().c_str());
         app.get_store().set(request.key(), request.value());
         app.get_store().release(request.key());
+        app.info("release lock for %s", request.key().c_str());
         final_response_to_cood = 1;
     } else {
         app.info("SET %s ABORTED", request.key().c_str());

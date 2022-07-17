@@ -53,8 +53,9 @@ inline int md5_mod(string s, int mod = MyConst::ring_size) {
   hash.process_bytes(s.data(), s.size());
   hash.get_digest(digest);
   const int *p = (const int *) &digest;
-  int last_32_bits = p[3];
-  return last_32_bits % mod;
+  int result = p[3] % mod;
+  if (result < 0) result += mod;
+  return result % mod;
 }
 
 template<typename T>

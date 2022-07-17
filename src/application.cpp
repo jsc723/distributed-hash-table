@@ -109,7 +109,6 @@ void application::update(const MemberInfo &info, bool forced) {
             if ((memberListEntryIsValid(e) && e.heartbeat < info.heartbeat )|| forced) {
                 e.heartbeat = info.heartbeat;
                 e.timestamp = get_local_time();
-                debug("update node %d, heartbeat = %d", e.id, e.heartbeat);
             }
             return;
         }
