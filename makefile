@@ -35,7 +35,8 @@ PCH_OUT = $(SRC_PATH)/headers.hpp.gch
 
 # clean files list
 DISTCLEAN_LIST := $(OBJ) \
-                  $(OBJ_DEBUG)
+                  $(OBJ_DEBUG) \
+				  $(CLIENT_OBJ)
 CLEAN_LIST := $(TARGET) \
 			  $(TARGET_DEBUG) \
 			  $(CLIENT_TARGET) \
@@ -60,8 +61,8 @@ $(TARGET_DEBUG): $(OBJ_DEBUG)
 $(PCH_OUT): $(PCH_SRC)
 	$(CC) $(CCFLAGS) -o $@ $<
 
-$(CLIENT_TARGET): $(CLIENT_OBJ)
-	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) $(LIBRA)
+$(CLIENT_TARGET): $(CLIENT_OBJ) $(OBJ)
+	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) obj/messages.pb.o obj/serializer.o $(LIBRA)
 
 $(CLIENT_OBJ_PATH)/%.o: $(SRC_PATH)/%.c* $(PCH_OUT)
 	$(CC) $(CCOBJFLAGS) -H -include $(PCH_SRC) -c -o $@ $<
@@ -69,7 +70,7 @@ $(CLIENT_OBJ_PATH)/%.o: $(SRC_PATH)/%.c* $(PCH_OUT)
 
 .PHONY: client
 client: $(CLIENT_TARGET)
-	$(CC) $(CCFLAGS) -o $@ $(CLIENT_OBJ) $(LIBRA)
+
 
 # phony rules
 .PHONY: makedir

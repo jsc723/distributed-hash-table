@@ -3,7 +3,7 @@
 2. log system [ok]
  - each node log with id
  - log goes to stderr
-3. serialize SET and GET
+3. serialize SET and GET (protobuf) [ok]
 4. set server side
 5. set client side
 6. get server side

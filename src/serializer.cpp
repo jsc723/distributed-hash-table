@@ -127,7 +127,7 @@ char *Serializer::decodeMemberList(char *mem, vector<MemberInfo> &lst) {
 // --------------------------------------
 
 MessageHdr *Serializer::Message::allocEncodeGetRequest(MsgType type, dh_message::GetRequest &req) {
-    int data_sz = req.ByteSize();
+    int data_sz = (int)req.ByteSizeLong();
     uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
     MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
     msg->size = msg_sz;

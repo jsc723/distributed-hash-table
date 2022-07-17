@@ -10,6 +10,8 @@ struct Serializer {
 	static char *decodeAddress(char *mem, Address &e);
 	static char *encodeString(char *mem, string s);
 	static char *decodeString(char *mem, string &s);
+
+
 	
 	struct Message {
 		static MessageHdr *allocEncodeJOINREQ(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
@@ -22,7 +24,7 @@ struct Serializer {
 
 		template<typename T>
 		static MessageHdr *allocEncode(MsgType type, T &req) {
-			int data_sz = req.ByteSize();
+			int data_sz = (int)req.ByteSizeLong();
 			uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
 			MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
 			msg->size = msg_sz;

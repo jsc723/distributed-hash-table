@@ -86,7 +86,10 @@ enum class MsgType{
     JOINREQ, //char addr[6], int ring_id, long heartbeat
 	  AD,      //list of nodes in the group
     GET,     //get value by key (key_t, ttl) -> (value_t, success?)
-    SET      //set value by key (key_t, value_t, ttl) -> success?
+    GET_RESPONSE,
+    SET,      //set value by key (key_t, value_t, ttl) -> success?
+    SET_RESPONSE,
+    DUMMY_END
 };
 
 struct MessageHdr {

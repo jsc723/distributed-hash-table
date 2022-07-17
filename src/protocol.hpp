@@ -141,13 +141,27 @@ protected:
 class set_handler : public protocol_base<set_handler> {
 public:
     friend class protocol_base<set_handler>;
+    typedef boost::function<void(shared_socket socket, MessageHdr *)> callback_t;
+
+    void set_callback(callback_t cb) {
+        callback = cb;
+    }
+
     void start();
-    ~set_handler() {}
+    void after_response(packet_receiver::pointer prc) {
+        prc->start();
+    }
+    ~set_handler() {
+        Serializer::Message::dealloc(response_msg);
+    }
 protected:
-    set_handler(application &app, MessageHdr *msg);
+    set_handler(application &app, MessageHdr *msg, shared_socket socket);
+    shared_socket socket;
     application &app;
-    data_store::key_t key;
-    data_store::value_t val;
+    dh_message::SetRequest request;
+    dh_message::SetResponse response;
+    MessageHdr *response_msg;
+    callback_t callback;
 };
 
 

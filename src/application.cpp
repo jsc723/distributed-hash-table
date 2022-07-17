@@ -83,6 +83,8 @@ void application::dispatch_packet(shared_socket socket, MessageHdr *msg) {
 
         case MsgType::SET: {
             info("SET message received");
+            auto handler = set_handler::create(*this, msg, socket);
+            handler->start();
         } break;
 
         default: {

@@ -1,6 +1,11 @@
 syntax = "proto3";
 package dh_message;
 
+message VersionedValue {
+    uint64 version = 1;
+    string value = 2;
+}
+
 message GetRequest {
     int32 transaction_id = 1;
 	int32 sender_id = 2;
@@ -12,17 +17,15 @@ message GetResponse {
     int32 transaction_id = 1;
     int32 sender_id = 2;
     int32 responder_id = 3;
-    uint64 version = 4;
-    string value = 5;
+    VersionedValue value = 4;
 }
 
 message SetRequest {
     int32 transaction_id = 1;
     int32 sender_id = 2;
     int32 ttl = 3;
-    uint64 version = 4;
-    string key = 5;
-    string value = 6;
+    string key = 4;
+    VersionedValue value = 5;
 }
 
 message SetResponse {
