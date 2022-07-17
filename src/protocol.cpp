@@ -195,21 +195,102 @@ void ad_handler::start() {
 // -------------------SET-----------------------------
 
 set_handler::set_handler(application &app, MessageHdr *msg, shared_socket socket)
-    :app(app), socket(socket) {
+    :app(app), socket(socket), response_msg(nullptr), request_msg(nullptr),
+     responsed_peer_cnt(0) {
     print_bytes(msg, std::min<int>(100, msg->size));
     request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
     app.info("set req: key=%s, val=%s, version=%ld", 
         request.key().c_str(), request.value().value().c_str(), request.value().version());
 }
 void set_handler::start() {
-    app.info("handle set request");
-    app.get_store().set(request.key(), request.value());
-    
-    response.set_success(true);
-    response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
+    app.debug("handle set request");
 
-    ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
-        bind(&set_handler::after_response, shared_from_this(), 
-            packet_receiver::create_dispatcher(app, socket))
-    );
+    // may be unnecessary
+    // if (peer == app.self_info()) {
+    //     app.info("handle set request locally");
+    //     app.get_store().set(request.key(), request.value());
+        
+    //     response.set_success(true);
+    //     response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
+
+    //     ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
+    //         bind(&set_handler::after_response, shared_from_this(), 
+    //             packet_receiver::create_dispatcher(app, socket))
+    //     );
+    //     return;
+    // }
+    
+    if (request.sender_id() != -1) {
+        //SET executer
+        do_execute();
+        return;
+    }
+    do_coordinate();
+}
+
+void set_handler::do_coordinate() {
+    int peer_idx = app.map_key_to_node_idx(request.key());
+    auto peer = app.get_member(peer_idx);
+    app.info("route set request to peer id = %d", peer.id);
+    peers.emplace_back(peer);
+
+    request.set_sender_id(app.self_info().id);
+    request_msg = Serializer::Message::allocEncode(MsgType::SET, request);
+    for(int idx = 0; idx < peers.size(); idx++) {
+        ba::async_write(*socket, ba::buffer(request_msg, request_msg->size),
+            bind(&set_handler::read_peer_response, shared_from_this(), idx)
+        );
+    }
+}
+void set_handler::do_execute() {
+    app.info("be selected as the storage node");
+    //check if this node can execute the SET (i.e. is there a lock on it now?)
+    //if ok, set a lock on the key, response a single byte = 0x1 (true)
+        //then wait for a single byte from peer (with a timeout) for the commit message
+        //if commit message = 0x1, commit it
+        //if not or timeout, release lock, close socket
+    //if not, response with a single byte = 0x0 (false), don't wait for lock
+}
+
+void set_handler::read_peer_response(int idx) {
+    ba::async_read(*socket, ba::buffer(&peer_response[idx], sizeof(peer_response[idx])),
+        bind(&set_handler::handle_peer_response, shared_from_this(), idx));
+}
+void set_handler::handle_peer_response(int idx) {
+    responsed_peer_cnt++;
+    if (responsed_peer_cnt == peers.size()) {
+        peer_commit_req = true;
+        for(int i = 0; i < peers.size(); i++) {
+            if (!peer_response[i]) {
+                peer_commit_req = false;
+                break;
+            }
+        }
+        responsed_peer_cnt = 0;
+        for(int idx = 0; idx < peers.size(); idx++) {
+            ba::async_write(*socket, ba::buffer(&peer_commit_req, sizeof(peer_commit_req)),
+                bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
+        }
+    }
+}
+void set_handler::after_commit_to_peer(int idx) {
+    responsed_peer_cnt++;
+    if (responsed_peer_cnt == peers.size()) {
+        int ok = 0, failed = 0;
+        for(int i = 0; i < peers.size(); i++) {
+            if (peer_response[i]) {
+                ok++;
+            } else {
+                failed++;
+            }
+        }
+        app.info("finish SET, ok=%d, failed=%d", ok, failed);
+        response.set_success(true);
+        response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
+
+        ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
+            bind(&set_handler::after_response, shared_from_this(), 
+                packet_receiver::create_dispatcher(app, socket))
+        );
+    }
 }

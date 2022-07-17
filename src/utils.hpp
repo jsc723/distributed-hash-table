@@ -29,7 +29,9 @@ struct MyConst {
   static const int check_memebr_interval = 5;
   static const int joinreq_retry_max = 5;
   static const int joinreq_retry_factor = 5;
+  static const int request_default_ttl = 3;
   static const uint32_t ring_size = 1 << 16;
+  static const int MAX_PEER_SIZE = 16;
 };
 
 inline timestamp_t get_local_time() {

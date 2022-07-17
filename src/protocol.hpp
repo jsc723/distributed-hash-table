@@ -152,19 +152,33 @@ public:
     }
 
     void start();
+    void do_coordinate();
+    void do_execute();
     void after_response(packet_receiver::pointer prc) {
         prc->start();
     }
+    void read_peer_response(int idx);
+    void handle_peer_response(int idx);
+    void after_commit_to_peer(int idx);
     ~set_handler() {
+        app.debug("release set_handler");
         Serializer::Message::dealloc(response_msg);
+        Serializer::Message::dealloc(request_msg);
     }
 protected:
     set_handler(application &app, MessageHdr *msg, shared_socket socket);
     shared_socket socket;
     application &app;
     dh_message::SetRequest request;
+    MessageHdr *request_msg;
     dh_message::SetResponse response;
     MessageHdr *response_msg;
+
+    vector<MemberInfo> peers;
+    int responsed_peer_cnt;
+    unsigned char peer_response[MyConst::MAX_PEER_SIZE];
+    unsigned char peer_commit_req;
+    unsigned char peer_commit_response[MyConst::MAX_PEER_SIZE];
     callback_t callback;
 };
 

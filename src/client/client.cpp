@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
                 vv->set_version(boost::lexical_cast<uint64_t>(cmd[3]));
 
                 dh_message::SetRequest req;
+                req.set_ttl(MyConst::request_default_ttl); 
                 req.set_sender_id(-1);
                 req.set_transaction_id(0);
                 req.set_key(cmd[1]);

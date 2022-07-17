@@ -75,6 +75,12 @@ public:
     data_store &get_store() {
         return store;
     }
+    MemberInfo &get_member(int idx) {
+        if (idx >= members.size()) {
+            critical("get_member idx out of range: %d", idx);
+        }
+        return members[idx];
+    }
     int map_key_to_node_idx(const data_store::key_t &key);
 
     virtual void vlog(LogLevel level, const char *format, va_list args){
