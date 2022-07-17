@@ -42,7 +42,7 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 
 void application::start_accept()
 {
-    auto socket = shared_ptr<tcp::socket>(new tcp::socket(io_context));
+    auto socket = shared_socket(new tcp::socket(io_context));
     packet_receiver::pointer packet_recv = packet_receiver::create(*this,
         socket, bind(&application::dispatch_packet, this, socket, boost::placeholders::_1));
 
@@ -56,24 +56,35 @@ void application::handle_accept(packet_receiver::pointer packet_recv,
 {
     if (!error)
     {
-        info("handle request");
+        info("Handle new request");
         packet_recv->start();
     }
     start_accept();
 }
 
-void application::dispatch_packet(shared_ptr<tcp::socket> socket, MessageHdr *msg) {
+void application::dispatch_packet(shared_socket socket, MessageHdr *msg) {
     switch(msg->msgType) {
-        case JOINREQ: {
+        case MsgType::JOINREQ: {
             info("JOINREQ message received");
             auto handler = joinreq_handler::create(msg, *this, socket);
             handler->start();
         } break;
-        case AD: {
+
+        case MsgType::AD: {
             info("AD message received");
             auto handler = ad_handler::create(*this, msg);
             handler->start();
         } break;
+        
+        case MsgType::GET: {
+            info("GET message received");
+
+        } break;
+
+        case MsgType::SET: {
+            info("SET message received");
+        } break;
+
         default: {
             info("Unknown messaged type received");
         }

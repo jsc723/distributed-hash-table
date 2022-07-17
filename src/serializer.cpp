@@ -28,13 +28,32 @@ char *Serializer::decodeAddress(char *mem, Address &addr) {
     addr = ipPortToAddress(ip, port);
     return mem;
 }
+
+char *encodeString(char *mem, string s) {
+    uint32_t size = s.size();
+    auto p = Mem::write(mem, size);
+    memcpy(p, s.c_str(), size);
+    p += size;
+    return p;
+}
+
+char *decodeString(char *mem, string &s) {
+    uint32_t size;
+    s.clear();
+    auto p = Mem::read(mem, size);
+    for(size_t i = 0; i < size; i++) {
+        s += p[i];
+    }
+    p += size;
+    return p;
+}
 	
 MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
-    msg->msgType = JOINREQ;
+    msg->msgType = MsgType::JOINREQ;
     auto p = (char *)(msg+1);
     p = encodeAddress(p, myaddr);
     p = Mem::write(p, id);
@@ -59,7 +78,7 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
     uint32_t msgSize = sizeof(MessageHdr) + lstSize;
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
     msg->size = msgSize;
-    msg->msgType = AD;
+    msg->msgType = MsgType::AD;
     encodeMemberList((char *)(msg+1), lst);
 
     return msg;
@@ -67,6 +86,15 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
 void Serializer::Message::decodeAD(MessageHdr *msg, vector<MemberInfo> &lst) {
     decodeMemberList((char *)(msg+1), lst);
 }
+
+MessageHdr *Serializer::Message::allocEncodeGET(pojo::get_t data) {
+    return nullptr;
+}
+
+void Serializer::Message::decodeGET(MessageHdr *msg, pojo::get_t &data) {
+    
+}
+
 char *Serializer::encodeMemberInfo(char *mem, const MemberInfo& e) {
     auto p = mem;
     p = Serializer::encodeAddress(p, e.address);

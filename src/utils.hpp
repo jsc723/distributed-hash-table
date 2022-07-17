@@ -18,7 +18,7 @@ namespace ba = boost::asio;
 namespace bpt = boost::posix_time;
 
 typedef boost::posix_time::ptime timestamp_t;
-
+typedef shared_ptr<ba::ip::tcp::socket> shared_socket;
 struct MyConst {
 	static const int heartbeatInterval = 1;
 	static const int resendTimeout = 3;
@@ -81,15 +81,17 @@ struct MemberInfo {
   }
 };
 
-enum MsgTypes{
-    DUMMYLASTMSGTYPE = 100,
+enum class MsgType{
+    DUMMY_START = 100,
     JOINREQ, //char addr[6], int ring_id, long heartbeat
-	  AD      //list of nodes in the group
+	  AD,      //list of nodes in the group
+    GET,     //get value by key (key_t, ttl) -> (value_t, success?)
+    SET      //set value by key (key_t, value_t, ttl) -> success?
 };
 
 struct MessageHdr {
   uint32_t size;
-	enum MsgTypes msgType;
+	enum MsgType msgType;
 };
 
 inline std::string make_daytime_string()

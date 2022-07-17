@@ -23,11 +23,11 @@ public:
     int id;
     typedef boost::function<void(MessageHdr *)> callback_t;
     void start(); //read packet size
-    shared_ptr<tcp::socket> get_socket() {
+    shared_socket get_socket() {
         return socket;
     }
 protected:
-    packet_receiver(Loggable &log, shared_ptr<tcp::socket> socket, callback_t cb)
+    packet_receiver(Loggable &log, shared_socket socket, callback_t cb)
         : log(log), socket(socket), callback(cb), packet_sz(0), id(nextId++)
         {}
     void read_packet(const boost::system::error_code & ec/*error*/,
@@ -38,7 +38,7 @@ protected:
 
     Loggable &log;
     callback_t callback;
-    shared_ptr<tcp::socket> socket;
+    shared_socket socket;
     boost::asio::streambuf buffer;
     uint32_t packet_sz;
 };
@@ -60,8 +60,8 @@ public:
     }
 
 protected:
-    joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket);
-    shared_ptr<tcp::socket> socket;
+    joinreq_handler(MessageHdr *msg, application &app, shared_socket socket);
+    shared_socket socket;
     MessageHdr *response;
     application &app;
     boost::asio::streambuf buffer;
@@ -80,7 +80,7 @@ public:
 
 protected:
     joinreq_client(application &app);
-    shared_ptr<tcp::socket> socket;
+    shared_socket socket;
     application &app;
     boost::asio::streambuf buffer;
     MessageHdr *msg;
@@ -101,8 +101,8 @@ protected:
     ad_sender(application &app);
 
     void async_connect_send(const Address &addr);
-    void async_send(shared_ptr<tcp::socket> socket);
-    void after_send(shared_ptr<tcp::socket> socket) {
+    void async_send(shared_socket socket);
+    void after_send(shared_socket socket) {
         //need to hold a pointer to socket otherwise it is destroied
         app.debug("AD is sent");
     }
@@ -124,3 +124,30 @@ protected:
     MessageHdr *msg;
     application &app;
 };
+
+//---------------------------GET--------------------------------
+class get_handler : public protocol_base<get_handler> {
+public:
+    friend class protocol_base<get_handler>;
+    void start(){}
+    ~get_handler() {}
+protected:
+    get_handler(application &app)
+    :app(app) {}
+    application &app;
+};
+
+//---------------------------SET--------------------------------
+class set_handler : public protocol_base<set_handler> {
+public:
+    friend class protocol_base<set_handler>;
+    void start();
+    ~set_handler() {}
+protected:
+    set_handler(application &app, MessageHdr *msg);
+    application &app;
+    data_store::key_t key;
+    data_store::value_t val;
+};
+
+

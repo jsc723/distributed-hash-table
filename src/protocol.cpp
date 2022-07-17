@@ -58,7 +58,7 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
 }
 /* ------------------------------- joinreq -------------------------------------*/
 
-joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_ptr<tcp::socket> socket)
+joinreq_handler::joinreq_handler(MessageHdr *msg, application &app, shared_socket socket)
 : app(app), socket(socket) {
     MemberInfo m;
     Serializer::Message::decodeJOINREQ(msg, m.address, m.id, m.ring_id, m.heartbeat);
@@ -90,7 +90,7 @@ void joinreq_client::start() {
     try {
         ba::ip::tcp::endpoint endpoint(
             ba::ip::address(app.get_bootstrap_address().ip), app.get_bootstrap_address().port);
-        socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
+        socket = shared_socket(new tcp::socket(app.get_context()));
         socket->connect(endpoint);
         auto packet_recv = packet_receiver::create(app, socket, 
             bind(&joinreq_client::handle_response, shared_from_this(),
@@ -165,7 +165,7 @@ void ad_sender::start() {
 void ad_sender::async_connect_send(const Address &addr) {
     try {
         ba::ip::tcp::endpoint endpoint(ba::ip::address(addr.ip), addr.port);
-        auto socket = shared_ptr<tcp::socket>(new tcp::socket(app.get_context()));
+        auto socket = shared_socket(new tcp::socket(app.get_context()));
         socket->async_connect(endpoint, bind(&ad_sender::async_send, shared_from_this(), socket));
     }
     catch (std::exception& e)
@@ -173,7 +173,7 @@ void ad_sender::async_connect_send(const Address &addr) {
         app.info("%s", e.what());
     }
 }
-void ad_sender::async_send(shared_ptr<tcp::socket> socket) {
+void ad_sender::async_send(shared_socket socket) {
     try {
         ba::async_write(*socket, ba::buffer(msg, msg->size), 
             bind(&ad_sender::after_send, shared_from_this(), socket));
@@ -188,4 +188,12 @@ void ad_handler::start() {
     vector<MemberInfo> adlst;
     Serializer::Message::decodeAD(msg, adlst);
     app.update(adlst);
+}
+
+// -------------------GET-----------------------------
+
+// -------------------SET-----------------------------
+
+void set_handler::start() {
+    
 }
