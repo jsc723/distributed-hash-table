@@ -16,7 +16,7 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
     if (ec || bytes_transferred != sizeof(uint32_t)) {
         log.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
         if (ec) {
-            log.info("error: %s", ec.message().c_str());
+            log.info("%s", ec.message().c_str());
         }
         return;
     }
@@ -35,7 +35,7 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
 void packet_receiver::finish_read(const boost::system::error_code & ec, size_t bytes_transferred)
 {
     if (ec) {
-        log.info("error: %s", ec.message().c_str());
+        log.info("%s", ec.message().c_str());
         return;
     }
     if (bytes_transferred != packet_sz - sizeof(packet_sz)) {
@@ -214,7 +214,7 @@ void get_handler::do_coordinate() {
     peers.emplace_back(peer);
 
     request.set_sender_id(app.self_info().id);
-    msg_to_peers = Serializer::Message::allocEncode(MsgType::SET, request);
+    msg_to_peers = Serializer::Message::allocEncode(MsgType::GET, request);
     for(int idx = 0; idx < peers.size(); idx++) {
         peer_response.emplace_back();
         try {
@@ -282,7 +282,26 @@ void get_handler::read_peer_response(int idx, MessageHdr *msg) {
 }
 
 void get_handler::do_execute() {
+    app.debug("do GET for %s", request.key().c_str());
+    auto val_exist = app.get_store().get(request.key());
+    response.set_responder_id(app.self_info().id);
+    if (!val_exist.second) { //not ok
+        response.set_success(false);
+        app.debug("found key");
+    } else {
+        auto val = val_exist.first;
+        response.set_success(true);
+        response.mutable_value()->set_value(val.value);
+        response.mutable_value()->set_version(val.version);
+        app.debug("did not found key");
+    }
+    response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
+    ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
+        bind(&get_handler::after_response, shared_from_this()));
+}
 
+void get_handler::after_response() {
+    //nothing
 }
 
 

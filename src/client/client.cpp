@@ -72,17 +72,12 @@ int main(int argc, char *argv[])
                 req.set_key(cmd[1]);
                 req.set_allocated_value(vv);
                 MessageHdr *msg_req = Serializer::Message::allocEncode(MsgType::SET, req);
-                print_bytes(msg_req, std::min<int>(100, msg_req->size));
+                //print_bytes(msg_req, std::min<int>(100, msg_req->size));
 
-                dh_message::SetRequest req1;
-                req1.ParseFromArray(msg_req->payload, msg_req->size - sizeof(MessageHdr));
-                cout << "test " << req1.key() << " " << req1.value().value() << endl;
                 ba::write(socket, ba::buffer(msg_req, msg_req->size));
-                cout << "request is sent" << endl;
 
                 uint32_t packet_sz;
                 ba::read(socket, ba::buffer(&packet_sz, sizeof(packet_sz)), ba::transfer_exactly(sizeof(uint32_t)));
-                cout << "packet_sz = " << packet_sz << endl;
 
                 MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
                 msg_result->size = packet_sz;
@@ -97,12 +92,44 @@ int main(int argc, char *argv[])
                     cout << "failed: " << response.msg() << endl;
                 }
 
-                free(msg_result);
+                Serializer::Message::dealloc(msg_result);
                 Serializer::Message::dealloc(msg_req);
             }
             else if (cmd[0] == "get")
             {
-                cout << "not implemented" << endl;
+                if (cmd.size() != 2)
+                {
+                    cout << "invalid num of args" << endl;
+                    continue;
+                }
+                dh_message::GetRequest req;
+                req.set_ttl(MyConst::request_default_ttl); 
+                req.set_sender_id(-1);
+                req.set_transaction_id(0);
+                req.set_key(cmd[1]);
+                MessageHdr *msg_req = Serializer::Message::allocEncode(MsgType::GET, req);
+                //print_bytes(msg_req, std::min<int>(100, msg_req->size));
+
+                ba::write(socket, ba::buffer(msg_req, msg_req->size));
+
+                uint32_t packet_sz;
+                ba::read(socket, ba::buffer(&packet_sz, sizeof(packet_sz)), ba::transfer_exactly(sizeof(uint32_t)));
+
+                MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
+                msg_result->size = packet_sz;
+                ba::read(socket, ba::buffer(&(msg_result->msgType), packet_sz - sizeof(packet_sz)));
+
+                dh_message::GetResponse response;
+                response.ParseFromArray(msg_result->payload, msg_result->size - sizeof(MessageHdr));
+
+                if (response.success()) {
+                    cout << response.value().value() << endl;
+                } else {
+                    cout << "failed" << endl;
+                }
+
+                Serializer::Message::dealloc(msg_result);
+                Serializer::Message::dealloc(msg_req);
             }
             else if (cmd[0] == "exit")
             {

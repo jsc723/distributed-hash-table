@@ -192,8 +192,8 @@ public:
     void start_prc(packet_receiver::pointer prc);
 
     void do_execute();
-
     void after_response();
+    
     ~get_handler() {
         app.debug("release get_handler");
         Serializer::Message::dealloc(response_msg);
