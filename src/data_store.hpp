@@ -17,6 +17,10 @@ public:
     };
     pair<value_t, bool> get(const key_t &key);
     bool set(const key_t &key, const value_t& val);
+    bool lock(const key_t &key);
+    bool check_lock(const key_t &key);
+    void release(const key_t &key);
 private:
     unordered_map<key_t, value_t> m;
+    unordered_set<key_t> locks;
 };

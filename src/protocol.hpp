@@ -157,9 +157,18 @@ public:
     void after_response(packet_receiver::pointer prc) {
         prc->start();
     }
+
+    //coordinator
+    void send_req_to_peer(int idx);
     void read_peer_response(int idx);
     void handle_peer_response(int idx);
     void after_commit_to_peer(int idx);
+
+    //executor
+    void read_commit();
+    void handle_commit();
+    void after_final_response();
+
     ~set_handler() {
         app.debug("release set_handler");
         Serializer::Message::dealloc(response_msg);
@@ -174,11 +183,18 @@ protected:
     dh_message::SetResponse response;
     MessageHdr *response_msg;
 
+    //coordinator
     vector<MemberInfo> peers;
+    vector<shared_socket> peer_sockets;
     int responsed_peer_cnt;
     unsigned char peer_response[MyConst::MAX_PEER_SIZE];
     unsigned char peer_commit_req;
     unsigned char peer_commit_response[MyConst::MAX_PEER_SIZE];
+
+    //executor
+    unsigned char response_to_cood;
+    unsigned char commit_from_cood;
+    unsigned char final_response_to_cood;
     callback_t callback;
 };
 

@@ -10,6 +10,7 @@
 using std::string;
 using std::vector;
 using std::unordered_map;
+using std::unordered_set;
 using std::pair;
 using std::tuple;
 using boost::shared_ptr;
@@ -54,6 +55,11 @@ inline int md5_mod(string s, int mod = MyConst::ring_size) {
   const int *p = (const int *) &digest;
   int last_32_bits = p[3];
   return last_32_bits % mod;
+}
+
+template<typename T>
+auto make_buffer(T& val) -> decltype(ba::buffer(&val, sizeof(val))) {
+  return ba::buffer(&val, sizeof(val));
 }
 
 struct Address {
