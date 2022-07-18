@@ -9,5 +9,8 @@
 6. get server side [ok]
 7. get client side [ok]
 8. get replica [ok]
-9. set replica
-    - todo: commit messages needs to be sent over packets, not a single byte
+9. set replica [ok]
+    - todo: commit messages needs to be sent over packets, not a single byte [ok]
+10. get/set replica tested working [ok]
+11. eventual consistancy
+12. refactor

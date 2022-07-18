@@ -354,7 +354,7 @@ void get_handler::after_response() {
 set_handler::set_handler(application &app, MessageHdr *msg, shared_socket socket)
     :app(app), socket(socket), response_msg(nullptr), request_msg(nullptr),
      responsed_peer_cnt(0), peer_commit_req(nullptr), response_to_cood(nullptr),
-     final_response_to_cood(nullptr)  {
+     final_response_to_cood(nullptr), final_responsed_peer_cnt(0), is_coordinator(false)  {
     request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
     app.info("set req: key=%s, val=%s, version=%ld", 
         request.key().c_str(), request.value().value().c_str(), request.value().version());
