@@ -85,6 +85,16 @@ struct MemberInfo {
   bool operator==(const MemberInfo &rhs) const {
     return id == rhs.id && address == rhs.address;
   }
+
+  bool isValid() {
+    auto time_diff = get_local_time() - timestamp;
+    return time_diff.total_seconds() < DHConst::TimeoutFail;
+  }
+
+  bool shouldRemoved() {
+    auto time_diff = get_local_time() - timestamp;
+    return time_diff.total_seconds() >= DHConst::TimeoutRemove;
+  }
 };
 
 enum class MsgType{

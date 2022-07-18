@@ -27,7 +27,7 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
 
 void application::init() {
     info("---Start application---");
-    introduce_self_to_group();
+    join_cluster();
     // ----------------------------- repeating tasks ------------------------------//
 
     add_repeating_task(bind(&application::heartbeat_loop, this), 
@@ -106,7 +106,7 @@ void application::update(const MemberInfo &info, bool forced) {
     }
     for(auto &e: members) {
         if (e == info) {
-            if ((memberListEntryIsValid(e) && e.heartbeat < info.heartbeat )|| forced) {
+            if ((e.isValid() && e.heartbeat < info.heartbeat )|| forced) {
                 e.heartbeat = info.heartbeat;
                 e.timestamp = get_local_time();
             }
@@ -145,35 +145,35 @@ vector<MemberInfo> application::getValidMembers()
 {
     vector<MemberInfo> validNodes;
     for(auto &e: members) {
-        if (memberListEntryIsValid(e)) {
+        if (e.isValid()) {
             validNodes.emplace_back(e);
         }
     }
     return validNodes;
 }
 
-vector<Address> application::sampleNodes(int k) {
+vector<Address> application::sampleNodes(int maxCount) {
     vector<MemberInfo> validNodes;
     for(auto &e: members) {
         if (e == self_info()) {
             continue;
         }
-        if (memberListEntryIsValid(e)) {
+        if (e.isValid()) {
             validNodes.emplace_back(e);
         }
     }
-    k = std::min<int>(k, validNodes.size());
+    maxCount = std::min<int>(maxCount, validNodes.size());
     vector<MemberInfo> shuffled(validNodes);
     std::random_shuffle(shuffled.begin(), shuffled.end());
-    vector<Address> sampled(k);
-    for(int i = 0; i < k; i++) {
+    vector<Address> sampled(maxCount);
+    for(int i = 0; i < maxCount; i++) {
         sampled[i] = shuffled[i].address;
     }
     return sampled;
 }
 
 
-void application::introduce_self_to_group() {
+void application::join_cluster() {
     MemberInfo &self = self_info();
     if (self.address == bootstrap_address)
     {
@@ -237,11 +237,11 @@ void application::check_member_loop() {
             continue;
         }
 
-        if (!memberListEntryIsValid(e) && e.isAlive) {
+        if (!e.isValid() && e.isAlive) {
             e.isAlive = false;
             info("node %d left the group", self_info().id, e.id);
         }
-        if (!memberListEntryShouldBeRemoved(e)) {
+        if (!e.shouldRemoved()) {
             updated.emplace_back(e);
         }
     }
@@ -256,7 +256,7 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
     size_t best_node_idx = 0;
     int min_diff = INT_MAX;
     for(size_t i = 0; i < members.size(); i++) {
-        if (!memberListEntryIsValid(members[i])) {
+        if (!members[i].isValid()) {
             continue;
         }
         int ring_id = members[i].ring_id;
@@ -277,7 +277,7 @@ vector<MemberInfo> application::get_group_starting_at(int idx, int max_size) {
     vector<MemberInfo> group;
     int i = idx;
     do {
-        if (memberListEntryIsValid(members[i])) {
+        if (members[i].isValid()) {
             group.emplace_back(members[i]);
         }
         i++;

@@ -28,7 +28,7 @@ public:
     void init();
 
 
-    void introduce_self_to_group();
+    void join_cluster();
     void start_accept();
     void handle_accept(shared_ptr<packet_receiver> new_connection,
                        const boost::system::error_code &error);
@@ -52,16 +52,6 @@ public:
 
     vector<MemberInfo> getValidMembers();
     vector<Address> sampleNodes(int k);
-
-    bool memberListEntryIsValid(const MemberInfo &e) {
-		auto time_diff = get_local_time() - e.timestamp;
-        return time_diff.total_seconds() < DHConst::TimeoutFail;
-	}
-
-    bool memberListEntryShouldBeRemoved(const MemberInfo &e) {
-        auto time_diff = get_local_time() - e.timestamp;
-		return time_diff.total_seconds() >= DHConst::TimeoutRemove;
-	}
 
     MemberInfo &self_info() {
         return members[self_index];
