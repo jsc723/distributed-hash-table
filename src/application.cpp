@@ -31,13 +31,13 @@ void application::init() {
     // ----------------------------- repeating tasks ------------------------------//
 
     add_repeating_task(bind(&application::heartbeat_loop, this), 
-        bpt::seconds(MyConst::heartbeatInterval));
+        bpt::seconds(DHConst::HeartBeatInterval));
 
     add_repeating_task(bind(&application::ad_loop, this),
-        bpt::seconds(MyConst::GossipInterval));
+        bpt::seconds(DHConst::GossipInterval));
 
     add_repeating_task(bind(&application::check_member_loop, this),
-        bpt::seconds(MyConst::check_memebr_interval));
+        bpt::seconds(DHConst::CheckMemberInterval));
 
     // -----------------------------------------------------------------------------//
     start_accept();
@@ -261,7 +261,7 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
         }
         int ring_id = members[i].ring_id;
         if (ring_id < ring_pos) {
-            ring_id += MyConst::ring_size;
+            ring_id += DHConst::RingSize;
         }
         if (ring_id - ring_pos < min_diff) {
             min_diff = ring_id - ring_pos;

@@ -4,8 +4,6 @@
 #define LOCALHOST "127.0.0.1"
 #define BOOTSTRAP_IP LOCALHOST
 #define BOOTSTRAP_PORT 9000
-#define RING_SIZE 65535
-#define MAX_PACKET_SZ 65535
 #define MSG_HEAD 0xbeefcade
 
 using std::string;
@@ -23,20 +21,20 @@ class MsgHdr;
 typedef boost::posix_time::ptime timestamp_t;
 typedef shared_ptr<ba::ip::tcp::socket> shared_socket;
 typedef shared_ptr<MsgHdr> shared_msg;
-struct MyConst {
-	static const int heartbeatInterval = 1;
-	static const int resendTimeout = 3;
+struct DHConst {
+	static const int HeartBeatInterval = 1;
+	static const int ResendTimeout = 3;
 	static const int GossipInterval = 3;
-	static const int timeoutFail = 15;
-	static const int timeoutRemove = 30;
+	static const int TimeoutFail = 15;
+	static const int TimeoutRemove = 30;
 	static const int GossipFan = 3;
-  static const int check_memebr_interval = 5;
-  static const int join_retry_max = 5;
-  static const int join_retry_factor = 5;
-  static const int request_default_ttl = 3;
-  static const uint32_t ring_size = 1 << 16;
-  static const int MAX_PEER_SIZE = 16;
+  static const int CheckMemberInterval = 5;
+  static const int JoinRetryMax = 5;
+  static const int JoinRetryFactor = 5;
+  static const int RequestDefaultTTL = 3;
+  static const uint32_t RingSize = 1 << 16;
   static const int ReplicaSize = 3;
+  static const int MaxPacketSize = 65535;
 };
 
 inline timestamp_t get_local_time() {
@@ -49,7 +47,7 @@ inline string time_to_string(timestamp_t t) {
   return ss.str();
 }
 
-inline int md5_mod(string s, int mod = MyConst::ring_size) {
+inline int md5_mod(string s, int mod = DHConst::RingSize) {
   using boost::uuids::detail::md5;
   md5 hash;
   md5::digest_type digest;

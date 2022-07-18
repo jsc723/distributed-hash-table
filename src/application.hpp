@@ -55,12 +55,12 @@ public:
 
     bool memberListEntryIsValid(const MemberInfo &e) {
 		auto time_diff = get_local_time() - e.timestamp;
-        return time_diff.total_seconds() < MyConst::timeoutFail;
+        return time_diff.total_seconds() < DHConst::TimeoutFail;
 	}
 
     bool memberListEntryShouldBeRemoved(const MemberInfo &e) {
         auto time_diff = get_local_time() - e.timestamp;
-		return time_diff.total_seconds() >= MyConst::timeoutRemove;
+		return time_diff.total_seconds() >= DHConst::TimeoutRemove;
 	}
 
     MemberInfo &self_info() {

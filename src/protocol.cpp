@@ -34,7 +34,7 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
     }
 
     packet_sz = hdr.size;
-    if (packet_sz > MAX_PACKET_SZ || packet_sz < sizeof(packet_sz)) { 
+    if (packet_sz > DHConst::MaxPacketSize || packet_sz < sizeof(packet_sz)) { 
         log.important("packet size is invalid: %u", packet_sz);
         return;
     }
@@ -130,9 +130,9 @@ void join_client::start() {
         success = false;
     }
     if (!success) {
-        if (join_retry++ < MyConst::join_retry_max) {
+        if (join_retry++ < DHConst::JoinRetryMax) {
             app.info("cannot join the group, retry later ...");
-            timer.expires_from_now(bpt::seconds(MyConst::join_retry_factor * join_retry));
+            timer.expires_from_now(bpt::seconds(DHConst::JoinRetryFactor * join_retry));
             timer.async_wait(bind(&join_client::start, shared_from_this()));
         }
         else {
@@ -146,9 +146,9 @@ void join_client::start() {
 void join_client::handle_write(const boost::system::error_code & ec, size_t bytes_transferred,
     packet_receiver::pointer pr) {
     if (ec || bytes_transferred != msg->size) {
-        if (join_retry++ < MyConst::join_retry_max) {
+        if (join_retry++ < DHConst::JoinRetryMax) {
             app.info("cannot join the group, retry later ...");
-            timer.expires_from_now(bpt::seconds(MyConst::join_retry_factor * join_retry));
+            timer.expires_from_now(bpt::seconds(DHConst::JoinRetryFactor * join_retry));
             timer.async_wait(bind(&join_client::start, shared_from_this()));
         }
         else {
@@ -177,7 +177,7 @@ ad_sender::ad_sender(application &app)
 }
 
 void ad_sender::start() {
-    auto sampled_addr = app.sampleNodes(MyConst::GossipFan);
+    auto sampled_addr = app.sampleNodes(DHConst::GossipFan);
     for(auto &addr: sampled_addr) {
         async_connect_send(addr);
     }
@@ -229,7 +229,7 @@ void get_handler::start() {
 
 void get_handler::do_coordinate() {
     int peer_idx = app.map_key_to_node_idx(request.key());
-    peers = app.get_group_starting_at(peer_idx, MyConst::ReplicaSize);
+    peers = app.get_group_starting_at(peer_idx, DHConst::ReplicaSize);
     for(auto &p: peers) {
         app.info("route get request to peer id = %d", p.id);
     }
@@ -372,7 +372,7 @@ void set_handler::start() {
 
 void set_handler::do_coordinate() {
     int peer_idx = app.map_key_to_node_idx(request.key());
-    peers = app.get_group_starting_at(peer_idx, MyConst::ReplicaSize);
+    peers = app.get_group_starting_at(peer_idx, DHConst::ReplicaSize);
     for(auto &p: peers) {
         app.info("route set request to peer id = %d", p.id);
     }
