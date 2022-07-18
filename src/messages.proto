@@ -40,3 +40,23 @@ message SetResponse {
 message SingleIntMessage {
     int32 val = 1;
 }
+
+message Address {
+    uint32 ip = 1;
+    uint32 port = 2;
+}
+
+message MemberInfo {
+    Address address = 1;
+    int32 id = 2;
+    int32 ring_id = 3;
+    int32 heartbeat = 4;
+}
+
+message JoinRequest {
+    MemberInfo info = 1;
+}
+
+message Advertisement {
+    repeated MemberInfo member = 1;
+}

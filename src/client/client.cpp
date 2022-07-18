@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
                 req.set_transaction_id(0);
                 req.set_key(cmd[1]);
                 req.set_allocated_value(vv);
-                shared_msg msg_req = Serializer::Message::allocEncode(MsgType::SET, req);
+                shared_msg msg_req = Serializer::allocEncode(MsgType::SET, req);
                 //print_bytes(msg_req, std::min<int>(100, msg_req->size));
 
                 ba::write(socket, msg_req->buffer());
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
                 req.set_sender_id(-1);
                 req.set_transaction_id(0);
                 req.set_key(cmd[1]);
-                shared_msg msg_req = Serializer::Message::allocEncode(MsgType::GET, req);
+                shared_msg msg_req = Serializer::allocEncode(MsgType::GET, req);
                 //print_bytes(msg_req, std::min<int>(100, msg_req->size));
 
                 ba::write(socket, msg_req->buffer());

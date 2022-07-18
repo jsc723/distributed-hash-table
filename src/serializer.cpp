@@ -17,109 +17,22 @@ Address Serializer::ipPortToAddress(int ip, unsigned short port) {
     return addr;
 }
 
-char *Serializer::encodeAddress(char *mem, const Address& addr) {
-    int ip; unsigned short port;
-    addressToIpPort(addr, ip, port);
-    mem = Mem::write(mem, ip);
-    return Mem::write(mem, port);
-}
-char *Serializer::decodeAddress(char *mem, Address &addr) {
-    int ip; unsigned short port;
-    mem = Mem::read(mem, ip);
-    mem = Mem::read(mem, port);
-    addr = ipPortToAddress(ip, port);
-    return mem;
-}
-
-char *encodeString(char *mem, string s) {
-    uint32_t size = s.size();
-    auto p = Mem::write(mem, size);
-    memcpy(p, s.c_str(), size);
-    p += size;
-    return p;
-}
-
-char *decodeString(char *mem, string &s) {
-    uint32_t size;
-    s.clear();
-    auto p = Mem::read(mem, size);
-    for(size_t i = 0; i < size; i++) {
-        s += p[i];
-    }
-    p += size;
-    return p;
-}
-	
-shared_msg Serializer::Message::allocEncodeJOIN(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
-    uint32_t addr_sz = sizeof(int) + sizeof(short);
-    msgSize = sizeof(MsgHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
-    shared_msg msg = MsgHdr::create_shared(msgSize);
-    msg->msgType = MsgType::JOIN;
-    auto p = msg->payload;
-    p = encodeAddress(p, myaddr);
-    p = Mem::write(p, id);
-    p = Mem::write(p, ring_id);
-    p = Mem::write(p, heartbeat);
-    return msg;
-}
-void Serializer::Message::decodeJOIN(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
-    auto p = msg->payload;
-    p = decodeAddress(p, addr);
-    p = Mem::read(p, id);
-    p = Mem::read(p, ring_id);
-    p = Mem::read(p, heartbeat);
-}
-shared_msg Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
-    uint32_t addr_sz = sizeof(int) + sizeof(short);
-    const uint32_t entrySize = addr_sz
-                            + sizeof(MemberInfo::id) 
-                            + sizeof(MemberInfo::ring_id)
-                            + sizeof(MemberInfo::heartbeat);
-    uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
-    uint32_t msgSize = sizeof(MsgHdr) + lstSize;
-    shared_msg msg = MsgHdr::create_shared(msgSize);
-    msg->msgType = MsgType::AD;
-    encodeMemberList(msg->payload, lst);
-
-    return msg;
-}
-void Serializer::Message::decodeAD(shared_msg msg, vector<MemberInfo> &lst) {
-    decodeMemberList(msg->payload, lst);
-}
-
-char *Serializer::encodeMemberInfo(char *mem, const MemberInfo& e) {
-    auto p = mem;
-    p = Serializer::encodeAddress(p, e.address);
-    p = Mem::write(p, e.id);
-    p = Mem::write(p, e.ring_id);
-    p = Mem::write(p, e.heartbeat);
-    return p;
-}
-char *Serializer::decodeMemberInfo(char *mem, MemberInfo &e) {
-    auto p = mem;
-    p = Serializer::decodeAddress(p, e.address);
-    p = Mem::read(p, e.id);
-    p = Mem::read(p, e.ring_id);
-    p = Mem::read(p, e.heartbeat);
-    return p;
-}
-char *Serializer::encodeMemberList(char *mem, const vector<MemberInfo> &lst) {
-    uint32_t sz = lst.size();
-    auto p = mem;
-    p = Mem::write(p, sz);
+shared_msg Serializer::allocEncodeAD(const vector<MemberInfo> &lst) {
+    dh_message::Advertisement ad;
     for(auto &e: lst) {
-        p = encodeMemberInfo(p, e);
+        *ad.add_member() = e.toProto();
+        logger.log(LogLevel::DEBUG, "[Serializer]", "encode id=%d, hb=%d", e.id, e.heartbeat);
     }
-    return p;
+    logger.log(LogLevel::DEBUG, "[Serializer]", "encoded member sz =%d", ad.member_size());
+    return allocEncode(MsgType::AD, ad);
 }
-char *Serializer::decodeMemberList(char *mem, vector<MemberInfo> &lst) {
-    uint32_t sz;
-    auto p = Mem::read(mem, sz);
-    for(uint32_t i = 0; i < sz; i++) {
-        MemberInfo e;
-        p = decodeMemberInfo(p, e);
-        lst.emplace_back(std::move(e));
+void Serializer::decodeAD(shared_msg msg, vector<MemberInfo> &lst) {
+    dh_message::Advertisement ad;
+    ad.ParseFromArray(msg->payload, msg->payload_size());
+    logger.log(LogLevel::DEBUG, "[Serializer]", "decode ad, member_sz=%d", ad.member_size());
+    for(int i = 0; i < ad.member_size(); i++) {
+        lst.emplace_back(ad.member(i));
+        logger.log(LogLevel::DEBUG, "[Serializer]", "decode id=%d, hb=%d", lst.back().id, lst.back().heartbeat);
     }
-    return p;
 }
 

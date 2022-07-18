@@ -92,6 +92,10 @@ clean:
 	@echo CLEAN $(CLEAN_LIST)
 	@rm -f $(CLEAN_LIST)
 
+.PHONY: deepclean
+deepclean: clean
+	@rm -f $(PCH_OUT)
+
 .PHONY: distclean
 distclean:
 	@echo CLEAN $(DISTCLEAN_LIST)

@@ -73,6 +73,7 @@ void application::dispatch_packet(shared_socket socket, shared_msg msg) {
         } break;
 
         case MsgType::AD: {
+            info("AD message received");
             auto handler = ad_handler::create(*this, msg);
             handler->start();
         } break;

@@ -81,8 +81,9 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
 
 join_handler::join_handler(shared_msg msg, application &app, shared_socket socket)
 : app(app), socket(socket) {
-    MemberInfo m;
-    Serializer::Message::decodeJOIN(msg, m.address, m.id, m.ring_id, m.heartbeat);
+    dh_message::JoinRequest joinreq_proto;
+    joinreq_proto.ParseFromArray(msg->payload, msg->payload_size());
+    MemberInfo m(joinreq_proto.info());
     m.isAlive = true;
     app.update(m, true);
 }
@@ -90,7 +91,7 @@ join_handler::join_handler(shared_msg msg, application &app, shared_socket socke
 void join_handler::start() {
     //send an AD
     auto validMembers = app.getValidMembers();
-    response = Serializer::Message::allocEncodeAD(validMembers);
+    response = Serializer::allocEncodeAD(validMembers);
     ba::async_write(*socket, response->buffer(),
                         bind(&join_handler::after_write, shared_from_this()));
 }
@@ -98,9 +99,9 @@ void join_handler::start() {
 join_client::join_client(application &app)
 : app(app), join_retry(0), timer(app.get_context()) {
     MemberInfo &self = app.self_info();
-    uint32_t msgsize;
-    msg = Serializer::Message::allocEncodeJOIN(
-        self.address, self.id, self.ring_id, self.heartbeat, msgsize);
+    dh_message::JoinRequest joinreq_proto;
+    *joinreq_proto.mutable_info() = self.toProto();
+    msg = Serializer::allocEncode(MsgType::JOIN, joinreq_proto);
 }
 
 void join_client::start() {
@@ -162,7 +163,7 @@ void join_client::handle_write(const boost::system::error_code & ec, size_t byte
 void join_client::handle_response(shared_msg msg) {
     app.info("heared back from the group, set self to alive");
     vector<MemberInfo> adlst;
-    Serializer::Message::decodeAD(msg, adlst);
+    Serializer::decodeAD(msg, adlst);
     app.self_info().isAlive = true;
     app.update(adlst);
 }
@@ -173,7 +174,7 @@ ad_sender::ad_sender(application &app)
     :app(app)
 {
     auto validEntries = app.getValidMembers();
-    msg = Serializer::Message::allocEncodeAD(validEntries);
+    msg = Serializer::allocEncodeAD(validEntries);
 }
 
 void ad_sender::start() {
@@ -206,7 +207,7 @@ void ad_sender::async_send(shared_socket socket) {
 
 void ad_handler::start() {
     vector<MemberInfo> adlst;
-    Serializer::Message::decodeAD(msg, adlst);
+    Serializer::decodeAD(msg, adlst);
     app.update(adlst);
 }
 
@@ -235,7 +236,7 @@ void get_handler::do_coordinate() {
     }
 
     request.set_sender_id(app.self_info().id);
-    msg_to_peers = Serializer::Message::allocEncode(MsgType::GET, request);
+    msg_to_peers = Serializer::allocEncode(MsgType::GET, request);
     for(int idx = 0; idx < peers.size(); idx++) {
         peer_response.emplace_back();
         try {
@@ -316,7 +317,7 @@ void get_handler::send_response() {
     } else {
         response.set_success(false);
     }
-    response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
+    response_msg = Serializer::allocEncode(MsgType::GET_RESPONSE, response);
 
     auto prc = packet_receiver::create_dispatcher(app, socket);
     ba::async_write(*socket, response_msg->buffer(), 
@@ -338,7 +339,7 @@ void get_handler::do_execute() {
         response.mutable_value()->set_version(val.version);
         app.debug("found key");
     }
-    response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
+    response_msg = Serializer::allocEncode(MsgType::GET_RESPONSE, response);
     ba::async_write(*socket, response_msg->buffer(),
         bind(&get_handler::after_response, shared_from_this()));
 }
@@ -378,7 +379,7 @@ void set_handler::do_coordinate() {
     }
 
     request.set_sender_id(app.self_info().id);
-    request_msg = Serializer::Message::allocEncode(MsgType::SET, request);
+    request_msg = Serializer::allocEncode(MsgType::SET, request);
     for(int idx = 0; idx < peers.size(); idx++) {
         try {
             ba::ip::tcp::endpoint endpoint(ba::ip::address(peers[idx].address.ip), peers[idx].address.port);
@@ -432,7 +433,7 @@ void set_handler::handle_peer_response(shared_msg res_msg, int idx) {
                 break;
             }
         }
-        peer_commit_req = Serializer::Message::allocEncode(MsgType::DUMMY_START, bmsg);
+        peer_commit_req = Serializer::allocEncode(MsgType::DUMMY_START, bmsg);
         for(int idx = 0; idx < peers.size(); idx++) {
             ba::async_write(*peer_sockets[idx], peer_commit_req->buffer(),
                 bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
@@ -459,7 +460,7 @@ void set_handler::send_response() {
     app.info("finish SET, ok=%d, failed=%d", ok, failed);
     bool res = ok > 0;
     response.set_success(res);
-    response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
+    response_msg = Serializer::allocEncode(MsgType::SET_RESPONSE, response);
     app.debug("response msg = %p, sz = %d", response_msg, response_msg->size);
 
     ba::async_write(*socket, response_msg->buffer(),
@@ -490,7 +491,7 @@ void set_handler::do_execute() {
     }
     dh_message::SingleIntMessage b;
     b.set_val(ok);
-    response_to_cood = Serializer::Message::allocEncode(MsgType::DUMMY_START, b);
+    response_to_cood = Serializer::allocEncode(MsgType::DUMMY_START, b);
 
     auto prc = packet_receiver::create(app, socket, 
         bind(&set_handler::handle_commit, shared_from_this(), boost::placeholders::_1));
@@ -521,7 +522,7 @@ void set_handler::handle_commit(shared_msg commit_msg) {
     }
     
     b.set_val(final_ok);
-    final_response_to_cood = Serializer::Message::allocEncode(MsgType::DUMMY_START, b);
+    final_response_to_cood = Serializer::allocEncode(MsgType::DUMMY_START, b);
     ba::async_write(*socket, final_response_to_cood->buffer(),
         bind(&set_handler::after_final_response, shared_from_this()));
 }

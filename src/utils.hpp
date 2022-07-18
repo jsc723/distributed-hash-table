@@ -81,6 +81,16 @@ struct MemberInfo {
   MemberInfo(Address &addr, int id, int ring_id)
   : address(addr), id(id), ring_id(ring_id), heartbeat(0), isAlive(false), timestamp(get_local_time()) {
   }
+  MemberInfo(const dh_message::MemberInfo &proto_info)
+  : id(proto_info.id()),
+    ring_id(proto_info.ring_id()),
+    heartbeat(proto_info.heartbeat()),
+    isAlive(false), 
+    timestamp(get_local_time()) 
+  {
+     address.ip = boost::asio::ip::make_address_v4(proto_info.address().ip());
+     address.port = (unsigned short)proto_info.address().port();
+  }
 
   bool operator==(const MemberInfo &rhs) const {
     return id == rhs.id && address == rhs.address;
@@ -94,6 +104,16 @@ struct MemberInfo {
   bool shouldRemoved() {
     auto time_diff = get_local_time() - timestamp;
     return time_diff.total_seconds() >= DHConst::TimeoutRemove;
+  }
+
+  dh_message::MemberInfo toProto() const {
+    dh_message::MemberInfo proto_info;
+    proto_info.mutable_address()->set_ip(address.ip.to_uint());
+    proto_info.mutable_address()->set_port(address.port);
+    proto_info.set_id(id);
+    proto_info.set_ring_id(ring_id);
+    proto_info.set_heartbeat(heartbeat);
+    return proto_info;
   }
 };
 
