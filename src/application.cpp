@@ -64,7 +64,7 @@ void application::handle_accept(packet_receiver::pointer packet_recv,
     start_accept();
 }
 
-void application::dispatch_packet(shared_socket socket, MessageHdr *msg) {
+void application::dispatch_packet(shared_socket socket, shared_msg msg) {
     switch(msg->msgType) {
         case MsgType::JOINREQ: {
             info("JOINREQ message received");

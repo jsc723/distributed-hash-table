@@ -32,7 +32,7 @@ public:
     void start_accept();
     void handle_accept(shared_ptr<packet_receiver> new_connection,
                        const boost::system::error_code &error);
-    void dispatch_packet(shared_socket socket, MessageHdr *msg);
+    void dispatch_packet(shared_socket socket, shared_msg msg);
 
     void repeating_task_template(const boost::system::error_code& ec, int timer_idx,
                          task_callback_t callback, duration_t interval);

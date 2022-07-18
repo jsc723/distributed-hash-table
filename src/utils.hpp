@@ -19,8 +19,10 @@ using boost::bind;
 namespace ba = boost::asio;
 namespace bpt = boost::posix_time;
 
+class MessageHdr;
 typedef boost::posix_time::ptime timestamp_t;
 typedef shared_ptr<ba::ip::tcp::socket> shared_socket;
+typedef shared_ptr<MessageHdr> shared_msg;
 struct MyConst {
 	static const int heartbeatInterval = 1;
 	static const int resendTimeout = 3;
@@ -103,6 +105,22 @@ struct MessageHdr {
   uint32_t size;
 	enum MsgType msgType;
   char payload[0];
+  auto buffer() -> decltype(ba::buffer(this, size)) {
+    return ba::buffer(this, size);
+  }
+  auto payload_buffer() -> decltype(ba::buffer(this, size)) {
+    return ba::buffer(payload, size - sizeof(*this));
+  }
+  static shared_msg create_shared(uint32_t size) {
+    auto ptr = shared_msg((MessageHdr*)malloc(size), free);
+    ptr->HEAD = MSG_HEAD;
+    ptr->size = size;
+    ptr->msgType = MsgType::DUMMY_START;
+    return ptr;
+  }
+  size_t payload_size() {
+    return size - sizeof(*this);
+  }
 };
 
 inline std::string make_daytime_string()

@@ -74,10 +74,10 @@ int main(int argc, char *argv[])
                 req.set_transaction_id(0);
                 req.set_key(cmd[1]);
                 req.set_allocated_value(vv);
-                MessageHdr *msg_req = Serializer::Message::allocEncode(MsgType::SET, req);
+                shared_msg msg_req = Serializer::Message::allocEncode(MsgType::SET, req);
                 //print_bytes(msg_req, std::min<int>(100, msg_req->size));
 
-                ba::write(socket, ba::buffer(msg_req, msg_req->size));
+                ba::write(socket, msg_req->buffer());
 
                 MessageHdr hdr;
                 ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
@@ -86,12 +86,12 @@ int main(int argc, char *argv[])
                     cout << "message is corruptted" << endl;
                 }
 
-                MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
+                shared_msg msg_result = MessageHdr::create_shared(packet_sz);
                 *msg_result = hdr;
-                ba::read(socket, ba::buffer(msg_result->payload, packet_sz - sizeof(MessageHdr)));
+                ba::read(socket, msg_result->payload_buffer());
 
                 dh_message::SetResponse response;
-                response.ParseFromArray(msg_result->payload, packet_sz - sizeof(MessageHdr));
+                response.ParseFromArray(msg_result->payload, msg_result->payload_size());
 
                 if (response.success()) {
                     cout << "ok" << endl;
@@ -99,8 +99,6 @@ int main(int argc, char *argv[])
                     cout << "failed: " << response.msg() << endl;
                 }
 
-                Serializer::Message::dealloc(msg_result);
-                Serializer::Message::dealloc(msg_req);
             }
             else if (cmd[0] == "get")
             {
@@ -114,10 +112,10 @@ int main(int argc, char *argv[])
                 req.set_sender_id(-1);
                 req.set_transaction_id(0);
                 req.set_key(cmd[1]);
-                MessageHdr *msg_req = Serializer::Message::allocEncode(MsgType::GET, req);
+                shared_msg msg_req = Serializer::Message::allocEncode(MsgType::GET, req);
                 //print_bytes(msg_req, std::min<int>(100, msg_req->size));
 
-                ba::write(socket, ba::buffer(msg_req, msg_req->size));
+                ba::write(socket, msg_req->buffer());
 
                 MessageHdr hdr;
                 ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
@@ -126,12 +124,12 @@ int main(int argc, char *argv[])
                     cout << "message is corruptted" << endl;
                 }
 
-                MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
+                shared_msg msg_result = MessageHdr::create_shared(packet_sz);
                 *msg_result = hdr;
-                ba::read(socket, ba::buffer(msg_result->payload, packet_sz - sizeof(MessageHdr)));
+                ba::read(socket, msg_result->payload_buffer());
 
                 dh_message::GetResponse response;
-                response.ParseFromArray(msg_result->payload, packet_sz - sizeof(MessageHdr));
+                response.ParseFromArray(msg_result->payload, msg_result->payload_size());
 
                 if (response.success()) {
                     cout << response.value().value() << endl;
@@ -139,8 +137,6 @@ int main(int argc, char *argv[])
                     cout << "failed" << endl;
                 }
 
-                Serializer::Message::dealloc(msg_result);
-                Serializer::Message::dealloc(msg_req);
             }
             else if (cmd[0] == "exit")
             {

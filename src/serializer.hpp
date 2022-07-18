@@ -13,27 +13,21 @@ struct Serializer {
 
 	
 	struct Message {
-		static MessageHdr *allocEncodeJOINREQ(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
-		static void decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat);
-		static MessageHdr *allocEncodeAD(const vector<MemberInfo> &lst);
-		static void decodeAD(MessageHdr *msg, vector<MemberInfo> &lst);
+		static shared_msg allocEncodeJOINREQ(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
+		static void decodeJOINREQ(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat);
+		static shared_msg allocEncodeAD(const vector<MemberInfo> &lst);
+		static void decodeAD(shared_msg msg, vector<MemberInfo> &lst);
 
 
 		template<typename T>
-		static MessageHdr *allocEncode(MsgType type, T &req) {
+		static shared_msg allocEncode(MsgType type, T &req) {
 			int data_sz = (int)req.ByteSizeLong();
 			uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
-			MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
-			msg->HEAD = MSG_HEAD;
-			msg->size = msg_sz;
+			shared_msg msg = MessageHdr::create_shared(msg_sz);
 			msg->msgType = type;
-			char *payload = (char*)(msg+1);
+			char *payload = (char*)(msg.get()+1);
 			req.SerializeToArray(payload, data_sz);
 			return msg;
-		}
-
-		static void dealloc(MessageHdr *msg) {
-			free(msg);
 		}
 	};
 	static char *encodeMemberInfo(char *mem, const MemberInfo& e);

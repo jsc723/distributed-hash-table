@@ -50,12 +50,10 @@ char *decodeString(char *mem, string &s) {
     return p;
 }
 	
-MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
+shared_msg Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
-    MessageHdr *msg = (MessageHdr *) malloc(msgSize);
-    msg->HEAD = MSG_HEAD;
-    msg->size = msgSize;
+    shared_msg msg = MessageHdr::create_shared(msgSize);
     msg->msgType = MsgType::JOINREQ;
     auto p = msg->payload;
     p = encodeAddress(p, myaddr);
@@ -64,14 +62,14 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     p = Mem::write(p, heartbeat);
     return msg;
 }
-void Serializer::Message::decodeJOINREQ(MessageHdr *msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
+void Serializer::Message::decodeJOINREQ(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
     auto p = msg->payload;
     p = decodeAddress(p, addr);
     p = Mem::read(p, id);
     p = Mem::read(p, ring_id);
     p = Mem::read(p, heartbeat);
 }
-MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
+shared_msg Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     const uint32_t entrySize = addr_sz
                             + sizeof(MemberInfo::id) 
@@ -79,15 +77,13 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
                             + sizeof(MemberInfo::heartbeat);
     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
     uint32_t msgSize = sizeof(MessageHdr) + lstSize;
-    MessageHdr *msg = (MessageHdr *) malloc(msgSize);
-    msg->HEAD = MSG_HEAD;
-    msg->size = msgSize;
+    shared_msg msg = MessageHdr::create_shared(msgSize);
     msg->msgType = MsgType::AD;
     encodeMemberList(msg->payload, lst);
 
     return msg;
 }
-void Serializer::Message::decodeAD(MessageHdr *msg, vector<MemberInfo> &lst) {
+void Serializer::Message::decodeAD(shared_msg msg, vector<MemberInfo> &lst) {
     decodeMemberList(msg->payload, lst);
 }
 

@@ -21,7 +21,7 @@ public:
     friend class protocol_base<packet_receiver>;
     static int nextId;
     int id;
-    typedef boost::function<void(MessageHdr *)> callback_t;
+    typedef boost::function<void(shared_msg)> callback_t;
     typedef boost::function<void()> error_handler_t;
     void start(); //read packet size
     shared_socket get_socket() {
@@ -64,16 +64,15 @@ public:
     void start();
     void after_write() {
         app.debug("joinreq response is sent");
-        Serializer::Message::dealloc(response);
     }
     ~joinreq_handler() {
         app.debug("joinreq is released");
     }
 
 protected:
-    joinreq_handler(MessageHdr *msg, application &app, shared_socket socket);
+    joinreq_handler(shared_msg msg, application &app, shared_socket socket);
     shared_socket socket;
-    MessageHdr *response;
+    shared_msg response;
     application &app;
     boost::asio::streambuf buffer;
 };
@@ -84,9 +83,8 @@ public:
     void start();
     void handle_write(const boost::system::error_code & ec,
                       size_t bytes_transferred, packet_receiver::pointer pr);
-    void handle_response(MessageHdr *msg);
+    void handle_response(shared_msg msg);
     ~joinreq_client() {
-        Serializer::Message::dealloc(msg);
     }
 
 protected:
@@ -94,7 +92,7 @@ protected:
     shared_socket socket;
     application &app;
     boost::asio::streambuf buffer;
-    MessageHdr *msg;
+    shared_msg msg;
     boost::asio::deadline_timer timer;
     int joinreq_retry;
 };
@@ -105,7 +103,6 @@ public:
     friend class protocol_base<ad_sender>;
     void start();
     ~ad_sender() {
-        Serializer::Message::dealloc(msg);
     }
 
 protected:
@@ -116,7 +113,7 @@ protected:
     void after_send(shared_socket socket) {
         //need to hold a pointer to socket otherwise it is destroied
     }
-    MessageHdr *msg;
+    shared_msg msg;
     application &app;
 };
 
@@ -125,13 +122,12 @@ public:
     friend class protocol_base<ad_handler>;
     void start();
     ~ad_handler() {
-        Serializer::Message::dealloc(msg);
     }
 
 protected:
-    ad_handler(application &app, MessageHdr *msg):
+    ad_handler(application &app, shared_msg msg):
         app(app), msg(msg) {}
-    MessageHdr *msg;
+    shared_msg msg;
     application &app;
 };
 
@@ -149,32 +145,27 @@ public:
 
     //coordinator
     void send_req_to_peer(int idx);
-    void read_peer_response(MessageHdr *res_msg, int idx);
-    void handle_peer_response(MessageHdr *res_msg, int idx);
+    void read_peer_response(shared_msg res_msg, int idx);
+    void handle_peer_response(shared_msg res_msg, int idx);
     void after_commit_to_peer(int idx);
     void send_response();
     void prc_error_handler();
 
     //executor
-    void handle_commit(MessageHdr *commit_msg);
+    void handle_commit(shared_msg commit_msg);
     void after_final_response();
 
     ~set_handler() {
         app.debug("release set_handler, coordinator = %d", is_coordinator);
-        Serializer::Message::dealloc(response_msg);
-        Serializer::Message::dealloc(request_msg);
-        Serializer::Message::dealloc(peer_commit_req);
-        Serializer::Message::dealloc(response_to_cood);
-        Serializer::Message::dealloc(final_response_to_cood);
     }
 protected:
-    set_handler(application &app, MessageHdr *msg, shared_socket socket);
+    set_handler(application &app, shared_msg msg, shared_socket socket);
     shared_socket socket;
     application &app;
     dh_message::SetRequest request;
-    MessageHdr *request_msg;
+    shared_msg request_msg;
     dh_message::SetResponse response;
-    MessageHdr *response_msg;
+    shared_msg response_msg;
 
     //coordinator
     vector<MemberInfo> peers;
@@ -182,11 +173,11 @@ protected:
     int responsed_peer_cnt;
     int final_responsed_peer_cnt;
     vector<unsigned char> peer_response;
-    MessageHdr *peer_commit_req;
+    shared_msg peer_commit_req;
 
     //executor
-    MessageHdr *response_to_cood;
-    MessageHdr *final_response_to_cood;
+    shared_msg response_to_cood;
+    shared_msg final_response_to_cood;
 
     bool is_coordinator;
 };
@@ -201,7 +192,7 @@ public:
 
     void do_coordinate();
     void send_req_to_peer(int idx);
-    void read_peer_response(int idx, MessageHdr *msg);
+    void read_peer_response(int idx, shared_msg msg);
     void start_prc(packet_receiver::pointer prc);
     void prc_error_handler(int idx);
     void send_response();
@@ -211,18 +202,16 @@ public:
 
     ~get_handler() {
         app.debug("release get_handler");
-        Serializer::Message::dealloc(response_msg);
-        Serializer::Message::dealloc(msg_to_peers);
     }
 
 protected:
-    get_handler(application &app, MessageHdr *msg, shared_socket socket);
+    get_handler(application &app, shared_msg msg, shared_socket socket);
     shared_socket socket;
     application &app;
     dh_message::GetRequest request;
-    MessageHdr *msg_to_peers;
+    shared_msg msg_to_peers;
     dh_message::GetResponse response;
-    MessageHdr *response_msg;
+    shared_msg response_msg;
 
     //coordinator
     vector<MemberInfo> peers;
