@@ -5,7 +5,7 @@
 int packet_receiver::nextId = 0;
 void packet_receiver::start()
 {
-    ba::async_read(*socket, buffer, ba::transfer_exactly(sizeof(uint32_t)),
+    ba::async_read(*socket, buffer, ba::transfer_exactly(sizeof(MessageHdr)),
                             bind(&packet_receiver::read_packet, shared_from_this(),
                             ba::placeholders::error,
                             ba::placeholders::bytes_transferred));
@@ -13,7 +13,7 @@ void packet_receiver::start()
 
 void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
 {
-    if (ec || bytes_transferred != sizeof(uint32_t)) {
+    if (ec || bytes_transferred != sizeof(MessageHdr)) {
         log.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
         if (ec) {
             log.info("%s", ec.message().c_str());
@@ -24,12 +24,21 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
         return;
     }
     std::istream is(&buffer);
-    is.read((char*)&packet_sz, sizeof(packet_sz));
+    is.read((char*)&hdr, sizeof(MessageHdr));
+
+    if(hdr.HEAD != MSG_HEAD) {
+        log.critical("message is corrupted");
+        exit(1);
+    } else {
+        log.debug("message head is ok, sz=%d, type=%d", hdr.size, hdr.msgType);
+    }
+
+    packet_sz = hdr.size;
     if (packet_sz > MAX_PACKET_SZ || packet_sz < sizeof(packet_sz)) { 
         log.important("packet size is invalid: %u", packet_sz);
         return;
     }
-    ba::async_read(*socket, buffer, ba::transfer_exactly(packet_sz - sizeof(packet_sz)),
+    ba::async_read(*socket, buffer, ba::transfer_exactly(packet_sz - sizeof(MessageHdr)),
                             bind(&packet_receiver::finish_read, shared_from_this(),
                             ba::placeholders::error,
                             ba::placeholders::bytes_transferred));
@@ -44,7 +53,7 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
         }
         return;
     }
-    if (bytes_transferred != packet_sz - sizeof(packet_sz)) {
+    if (bytes_transferred != packet_sz - sizeof(MessageHdr)) {
         log.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
         if (error_handler) {
             error_handler();
@@ -53,8 +62,8 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     }
     MessageHdr *msg = (MessageHdr *)malloc(packet_sz);
     std::istream is(&buffer);
-    msg->size = packet_sz;
-    is.read((char*)&(msg->msgType), bytes_transferred);
+    *msg = hdr;
+    is.read(msg->payload, bytes_transferred);
     size_t actual = is.gcount();
     if (actual != bytes_transferred) {
         log.info("failed to read the whole packet, actual = %u", actual);
@@ -344,7 +353,8 @@ void get_handler::after_response() {
 
 set_handler::set_handler(application &app, MessageHdr *msg, shared_socket socket)
     :app(app), socket(socket), response_msg(nullptr), request_msg(nullptr),
-     responsed_peer_cnt(0) {
+     responsed_peer_cnt(0), peer_commit_req(nullptr), response_to_cood(nullptr),
+     final_response_to_cood(nullptr)  {
     request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
     app.info("set req: key=%s, val=%s, version=%ld", 
         request.key().c_str(), request.value().value().c_str(), request.value().version());
@@ -354,9 +364,11 @@ void set_handler::start() {
     app.debug("handle set request");
     if (request.sender_id() != -1) {
         //SET executer
+        is_coordinator = false;
         do_execute();
         return;
     }
+    is_coordinator = true;
     do_coordinate();
 }
 
@@ -374,6 +386,7 @@ void set_handler::do_coordinate() {
             ba::ip::tcp::endpoint endpoint(ba::ip::address(peers[idx].address.ip), peers[idx].address.port);
             auto peer_socket = shared_socket(new tcp::socket(app.get_context()));
             peer_sockets.emplace_back(peer_socket);
+            peer_response.emplace_back();
             peer_socket->async_connect(endpoint, 
                 bind(&set_handler::send_req_to_peer, shared_from_this(), idx));
         }
@@ -383,33 +396,126 @@ void set_handler::do_coordinate() {
         }
     }
 }
+
+
+///////////////////set handler coordinator///////////////////////
+
+void set_handler::send_req_to_peer(int idx) {
+    try {
+        app.info("send_req_to_peer, peer id = %d", peers[idx].id);
+        auto prc = packet_receiver::create(app, peer_sockets[idx], 
+            bind(&set_handler::handle_peer_response, shared_from_this(),
+                boost::placeholders::_1, idx));
+        prc->set_error_handler(bind(&set_handler::prc_error_handler, shared_from_this()));
+        ba::async_write(*peer_sockets[idx], ba::buffer(request_msg, request_msg->size),
+            bind(&set_handler::start_prc, shared_from_this(), prc)
+        );
+    }
+    catch (std::exception& e)
+    {
+        app.info("send_req_to_peer, peer id = %d: %s", peers[idx].id, e.what());
+    }
+}
+
+void set_handler::handle_peer_response(MessageHdr *res_msg, int idx) {
+    responsed_peer_cnt++;
+    app.info("handle_peer_response, peer id = %d", peers[idx].id);
+    dh_message::SingleIntMessage bmsg;
+    bmsg.ParseFromArray(res_msg->payload, res_msg->size - sizeof(MessageHdr));
+    Serializer::Message::dealloc(res_msg);
+
+    peer_response[idx] = bmsg.val();
+    if (responsed_peer_cnt == peers.size()) {
+        dh_message::SingleIntMessage bmsg;
+        bmsg.set_val(true);
+        for(int i = 0; i < peers.size(); i++) {
+            if (!peer_response[i]) {
+                app.info("decided to not commit");
+                bmsg.set_val(false);
+                break;
+            }
+        }
+        peer_commit_req = Serializer::Message::allocEncode(MsgType::DUMMY_START, bmsg);
+        for(int idx = 0; idx < peers.size(); idx++) {
+            ba::async_write(*peer_sockets[idx], ba::buffer(peer_commit_req, peer_commit_req->size),
+                bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
+        }
+    }
+}
+void set_handler::after_commit_to_peer(int idx) {
+    final_responsed_peer_cnt++;
+    app.info("after_commit_to_peer, peer id = %d, final_responsed_peer_cnt=%d", peers[idx].id, final_responsed_peer_cnt);
+    if (final_responsed_peer_cnt == peers.size()) {
+        send_response();
+    }
+}
+
+void set_handler::send_response() {
+    int ok = 0, failed = 0;
+    for(int i = 0; i < peers.size(); i++) {
+        if (peer_response[i]) {
+            ok++;
+        } else {
+            failed++;
+        }
+    }
+    app.info("finish SET, ok=%d, failed=%d", ok, failed);
+    bool res = ok > 0;
+    response.set_success(res);
+    response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
+    app.debug("response msg = %p, sz = %d", response_msg, response_msg->size);
+
+    ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
+        bind(&set_handler::start_prc, shared_from_this(), 
+            packet_receiver::create_dispatcher(app, socket)) 
+    );
+    //continue to handle client's upcoming requests
+}
+void set_handler::prc_error_handler() {
+    responsed_peer_cnt++;
+    final_responsed_peer_cnt++;
+    if (final_responsed_peer_cnt == peers.size()) {
+        send_response();
+    }
+}
+
+////////////////////////set handler execute//////////////////////////////
+
 void set_handler::do_execute() {
     app.info("be selected as the storage node");
+    bool ok = true;
     if (app.get_store().lock(request.key())) {
         app.debug("got the lock for %s", request.key().c_str());
-        response_to_cood = 1;
+        ok = true;
     } else {
         app.debug("unable to get lock for %s" , request.key().c_str());
-        response_to_cood = 0;
+        ok = false;
     }
-    ba::async_write(*socket, ba::buffer(&response_to_cood, sizeof(response_to_cood)),
-        bind(&set_handler::read_commit, shared_from_this()));
+    dh_message::SingleIntMessage b;
+    b.set_val(ok);
+    response_to_cood = Serializer::Message::allocEncode(MsgType::DUMMY_START, b);
+
+    auto prc = packet_receiver::create(app, socket, 
+        bind(&set_handler::handle_commit, shared_from_this(), boost::placeholders::_1));
+    ba::async_write(*socket, ba::buffer(response_to_cood, response_to_cood->size),
+        bind(&set_handler::start_prc, shared_from_this(), prc));
 }
-void set_handler::read_commit() {
-    ba::async_read(*socket, ba::buffer(&commit_from_cood, sizeof(commit_from_cood)),
-        bind(&set_handler::handle_commit, shared_from_this()));
-}
-void set_handler::handle_commit() {
+
+void set_handler::handle_commit(MessageHdr *commit_msg) {
+    dh_message::SingleIntMessage b;
+    b.ParseFromArray(commit_msg->payload, commit_msg->size - sizeof(MessageHdr));
+    bool commit_from_cood = b.val();
+    bool final_ok;
     app.debug("got commit message = %d", (int)commit_from_cood);
     if (commit_from_cood && app.get_store().check_lock(request.key())) {
         app.info("SET %s to %s", request.key().c_str(), request.value().value().c_str());
         app.get_store().set(request.key(), request.value());
         app.info("release lock for %s", request.key().c_str());
         auto check = app.get_store().get(request.key());
-        final_response_to_cood = 1;
+        final_ok = true;
     } else {
         app.info("SET %s ABORTED", request.key().c_str());
-        final_response_to_cood = 0;
+        final_ok = false;
     }
 
     if (app.get_store().check_lock(request.key())) {
@@ -417,65 +523,12 @@ void set_handler::handle_commit() {
         app.get_store().release(request.key());
     }
     
-    ba::async_write(*socket, make_buffer(final_response_to_cood),
+    b.set_val(final_ok);
+    final_response_to_cood = Serializer::Message::allocEncode(MsgType::DUMMY_START, b);
+    ba::async_write(*socket, ba::buffer(final_response_to_cood, final_response_to_cood->size),
         bind(&set_handler::after_final_response, shared_from_this()));
 }
 
 void set_handler::after_final_response() {
     //nothing
-}
-
-void set_handler::send_req_to_peer(int idx) {
-    try {
-        ba::async_write(*peer_sockets[idx], ba::buffer(request_msg, request_msg->size),
-            bind(&set_handler::read_peer_response, shared_from_this(), idx));
-    }
-    catch (std::exception& e)
-    {
-        app.info(e.what());
-    }
-}
-
-void set_handler::read_peer_response(int idx) {
-    ba::async_read(*peer_sockets[idx], ba::buffer(&peer_response[idx], sizeof(peer_response[idx])),
-        bind(&set_handler::handle_peer_response, shared_from_this(), idx));
-}
-void set_handler::handle_peer_response(int idx) {
-    responsed_peer_cnt++;
-    if (responsed_peer_cnt == peers.size()) {
-        peer_commit_req = true;
-        for(int i = 0; i < peers.size(); i++) {
-            if (!peer_response[i]) {
-                peer_commit_req = false;
-                break;
-            }
-        }
-        responsed_peer_cnt = 0;
-        for(int idx = 0; idx < peers.size(); idx++) {
-            ba::async_write(*peer_sockets[idx], ba::buffer(&peer_commit_req, sizeof(peer_commit_req)),
-                bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
-        }
-    }
-}
-void set_handler::after_commit_to_peer(int idx) {
-    responsed_peer_cnt++;
-    if (responsed_peer_cnt == peers.size()) {
-        int ok = 0, failed = 0;
-        for(int i = 0; i < peers.size(); i++) {
-            if (peer_response[i]) {
-                ok++;
-            } else {
-                failed++;
-            }
-        }
-        app.info("finish SET, ok=%d, failed=%d", ok, failed);
-        response.set_success(true);
-        response_msg = Serializer::Message::allocEncode(MsgType::SET_RESPONSE, response);
-
-        ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
-            bind(&set_handler::after_response, shared_from_this(), 
-                packet_receiver::create_dispatcher(app, socket)) 
-        //continue to handle client's upcoming requests
-        );
-    }
 }

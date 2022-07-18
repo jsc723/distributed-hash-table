@@ -45,6 +45,7 @@ protected:
     void finish_read(const boost::system::error_code & ec,
                       size_t bytes_transferred);
 
+    MessageHdr hdr;
     Loggable &log;
     callback_t callback;
     error_handler_t error_handler;
@@ -142,25 +143,29 @@ public:
     void start();
     void do_coordinate();
     void do_execute();
-    void after_response(packet_receiver::pointer prc) {
+    void start_prc(packet_receiver::pointer prc) {
         prc->start();
     }
 
     //coordinator
     void send_req_to_peer(int idx);
-    void read_peer_response(int idx);
-    void handle_peer_response(int idx);
+    void read_peer_response(MessageHdr *res_msg, int idx);
+    void handle_peer_response(MessageHdr *res_msg, int idx);
     void after_commit_to_peer(int idx);
+    void send_response();
+    void prc_error_handler();
 
     //executor
-    void read_commit();
-    void handle_commit();
+    void handle_commit(MessageHdr *commit_msg);
     void after_final_response();
 
     ~set_handler() {
-        app.debug("release set_handler");
+        app.debug("release set_handler, coordinator = %d", is_coordinator);
         Serializer::Message::dealloc(response_msg);
         Serializer::Message::dealloc(request_msg);
+        Serializer::Message::dealloc(peer_commit_req);
+        Serializer::Message::dealloc(response_to_cood);
+        Serializer::Message::dealloc(final_response_to_cood);
     }
 protected:
     set_handler(application &app, MessageHdr *msg, shared_socket socket);
@@ -175,16 +180,18 @@ protected:
     vector<MemberInfo> peers;
     vector<shared_socket> peer_sockets;
     int responsed_peer_cnt;
-    unsigned char peer_response[MyConst::MAX_PEER_SIZE];
-    unsigned char peer_commit_req;
-    unsigned char peer_commit_response[MyConst::MAX_PEER_SIZE];
+    int final_responsed_peer_cnt;
+    vector<unsigned char> peer_response;
+    MessageHdr *peer_commit_req;
 
     //executor
-    unsigned char response_to_cood;
-    unsigned char commit_from_cood;
-    unsigned char final_response_to_cood;
+    MessageHdr *response_to_cood;
+    MessageHdr *final_response_to_cood;
+
+    bool is_coordinator;
 };
 
+//--------------------------GET----------------------------------
 
 class get_handler : public protocol_base<get_handler> {
 public:

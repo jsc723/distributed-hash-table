@@ -6,6 +6,7 @@
 #define BOOTSTRAP_PORT 9000
 #define RING_SIZE 65535
 #define MAX_PACKET_SZ 65535
+#define MSG_HEAD 0xbeefcade
 
 using std::string;
 using std::vector;
@@ -59,11 +60,6 @@ inline int md5_mod(string s, int mod = MyConst::ring_size) {
   return result % mod;
 }
 
-template<typename T>
-auto make_buffer(T& val) -> decltype(ba::buffer(&val, sizeof(val))) {
-  return ba::buffer(&val, sizeof(val));
-}
-
 struct Address {
   boost::asio::ip::address_v4 ip;
   unsigned short port;
@@ -103,6 +99,7 @@ enum class MsgType{
 };
 
 struct MessageHdr {
+  uint32_t HEAD;
   uint32_t size;
 	enum MsgType msgType;
   char payload[0];

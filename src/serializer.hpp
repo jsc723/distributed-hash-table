@@ -18,14 +18,13 @@ struct Serializer {
 		static MessageHdr *allocEncodeAD(const vector<MemberInfo> &lst);
 		static void decodeAD(MessageHdr *msg, vector<MemberInfo> &lst);
 
-		
-		static MessageHdr *allocEncodeGetRequest(MsgType type, dh_message::GetRequest &req);
 
 		template<typename T>
 		static MessageHdr *allocEncode(MsgType type, T &req) {
 			int data_sz = (int)req.ByteSizeLong();
 			uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
 			MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
+			msg->HEAD = MSG_HEAD;
 			msg->size = msg_sz;
 			msg->msgType = type;
 			char *payload = (char*)(msg+1);

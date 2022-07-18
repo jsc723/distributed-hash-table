@@ -36,3 +36,7 @@ message SetResponse {
     bool success = 4;
     string msg = 5;
 }
+
+message SingleIntMessage {
+    int32 val = 1;
+}

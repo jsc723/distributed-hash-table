@@ -79,15 +79,19 @@ int main(int argc, char *argv[])
 
                 ba::write(socket, ba::buffer(msg_req, msg_req->size));
 
-                uint32_t packet_sz;
-                ba::read(socket, ba::buffer(&packet_sz, sizeof(packet_sz)), ba::transfer_exactly(sizeof(uint32_t)));
+                MessageHdr hdr;
+                ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
+                uint32_t packet_sz = hdr.size;
+                if (hdr.HEAD != MSG_HEAD) {
+                    cout << "message is corruptted" << endl;
+                }
 
                 MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
-                msg_result->size = packet_sz;
-                ba::read(socket, ba::buffer(&(msg_result->msgType), packet_sz - sizeof(packet_sz)));
+                *msg_result = hdr;
+                ba::read(socket, ba::buffer(msg_result->payload, packet_sz - sizeof(MessageHdr)));
 
                 dh_message::SetResponse response;
-                response.ParseFromArray(msg_result->payload, msg_result->size - sizeof(MessageHdr));
+                response.ParseFromArray(msg_result->payload, packet_sz - sizeof(MessageHdr));
 
                 if (response.success()) {
                     cout << "ok" << endl;
@@ -115,15 +119,19 @@ int main(int argc, char *argv[])
 
                 ba::write(socket, ba::buffer(msg_req, msg_req->size));
 
-                uint32_t packet_sz;
-                ba::read(socket, ba::buffer(&packet_sz, sizeof(packet_sz)), ba::transfer_exactly(sizeof(uint32_t)));
+                MessageHdr hdr;
+                ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
+                uint32_t packet_sz = hdr.size;
+                if (hdr.HEAD != MSG_HEAD) {
+                    cout << "message is corruptted" << endl;
+                }
 
                 MessageHdr *msg_result = (MessageHdr *)malloc(packet_sz);
-                msg_result->size = packet_sz;
-                ba::read(socket, ba::buffer(&(msg_result->msgType), packet_sz - sizeof(packet_sz)));
+                *msg_result = hdr;
+                ba::read(socket, ba::buffer(msg_result->payload, packet_sz - sizeof(MessageHdr)));
 
                 dh_message::GetResponse response;
-                response.ParseFromArray(msg_result->payload, msg_result->size - sizeof(MessageHdr));
+                response.ParseFromArray(msg_result->payload, packet_sz - sizeof(MessageHdr));
 
                 if (response.success()) {
                     cout << response.value().value() << endl;

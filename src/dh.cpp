@@ -7,8 +7,6 @@ using std::string;
 using std::vector;
 using boost::shared_ptr;
 
-Logger logger;
-
 int main(int argc, char *argv[])
 {
     logger.set_log_level(LogLevel::DEBUG);

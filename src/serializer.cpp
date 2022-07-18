@@ -1,5 +1,7 @@
 #include "serializer.hpp"
 
+
+Logger logger;
 //----------------------------------------------------------------//
 /* ------------------------- Serializer --------------------------*/
 //----------------------------------------------------------------//
@@ -52,6 +54,7 @@ MessageHdr *Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int i
     uint32_t addr_sz = sizeof(int) + sizeof(short);
     msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
+    msg->HEAD = MSG_HEAD;
     msg->size = msgSize;
     msg->msgType = MsgType::JOINREQ;
     auto p = msg->payload;
@@ -77,6 +80,7 @@ MessageHdr *Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
     uint32_t msgSize = sizeof(MessageHdr) + lstSize;
     MessageHdr *msg = (MessageHdr *) malloc(msgSize);
+    msg->HEAD = MSG_HEAD;
     msg->size = msgSize;
     msg->msgType = MsgType::AD;
     encodeMemberList(msg->payload, lst);
@@ -123,15 +127,3 @@ char *Serializer::decodeMemberList(char *mem, vector<MemberInfo> &lst) {
     return p;
 }
 
-
-// --------------------------------------
-
-MessageHdr *Serializer::Message::allocEncodeGetRequest(MsgType type, dh_message::GetRequest &req) {
-    int data_sz = (int)req.ByteSizeLong();
-    uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
-    MessageHdr *msg = (MessageHdr *) malloc(msg_sz);
-    msg->size = msg_sz;
-    msg->msgType = type;
-    req.SerializeToArray(&(msg->payload), data_sz);
-    return msg;
-}
