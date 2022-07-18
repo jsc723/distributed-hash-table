@@ -5,7 +5,7 @@
 int packet_receiver::nextId = 0;
 void packet_receiver::start()
 {
-    ba::async_read(*socket, buffer, ba::transfer_exactly(sizeof(MessageHdr)),
+    ba::async_read(*socket, buffer, ba::transfer_exactly(sizeof(MsgHdr)),
                             bind(&packet_receiver::read_packet, shared_from_this(),
                             ba::placeholders::error,
                             ba::placeholders::bytes_transferred));
@@ -13,7 +13,7 @@ void packet_receiver::start()
 
 void packet_receiver::read_packet(const boost::system::error_code & ec, size_t bytes_transferred)
 {
-    if (ec || bytes_transferred != sizeof(MessageHdr)) {
+    if (ec || bytes_transferred != sizeof(MsgHdr)) {
         log.info("Did not read the num of bytes to transfer, bytes transfered = %d", bytes_transferred);
         if (ec) {
             log.info("%s", ec.message().c_str());
@@ -24,7 +24,7 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
         return;
     }
     std::istream is(&buffer);
-    is.read((char*)&hdr, sizeof(MessageHdr));
+    is.read((char*)&hdr, sizeof(MsgHdr));
 
     if(hdr.HEAD != MSG_HEAD) {
         log.critical("message is corrupted");
@@ -53,14 +53,14 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
         }
         return;
     }
-    if (bytes_transferred != packet_sz - sizeof(MessageHdr)) {
+    if (bytes_transferred != packet_sz - sizeof(MsgHdr)) {
         log.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
         if (error_handler) {
             error_handler();
         }
         return;
     }
-    shared_msg msg = MessageHdr::create_shared(packet_sz);
+    shared_msg msg = MsgHdr::create_shared(packet_sz);
     std::istream is(&buffer);
     *msg = hdr;
     is.read(msg->payload, bytes_transferred);
@@ -77,36 +77,36 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
         return;
     }
 }
-/* ------------------------------- joinreq -------------------------------------*/
+/* ------------------------------- join -------------------------------------*/
 
-joinreq_handler::joinreq_handler(shared_msg msg, application &app, shared_socket socket)
+join_handler::join_handler(shared_msg msg, application &app, shared_socket socket)
 : app(app), socket(socket) {
     MemberInfo m;
-    Serializer::Message::decodeJOINREQ(msg, m.address, m.id, m.ring_id, m.heartbeat);
+    Serializer::Message::decodeJOIN(msg, m.address, m.id, m.ring_id, m.heartbeat);
     m.isAlive = true;
     app.update(m, true);
 }
 
-void joinreq_handler::start() {
+void join_handler::start() {
     //send an AD
     auto validMembers = app.getValidMembers();
     response = Serializer::Message::allocEncodeAD(validMembers);
     ba::async_write(*socket, response->buffer(),
-                        bind(&joinreq_handler::after_write, shared_from_this()));
+                        bind(&join_handler::after_write, shared_from_this()));
 }
 
-joinreq_client::joinreq_client(application &app)
-: app(app), joinreq_retry(0), timer(app.get_context()) {
+join_client::join_client(application &app)
+: app(app), join_retry(0), timer(app.get_context()) {
     MemberInfo &self = app.self_info();
     uint32_t msgsize;
-    msg = Serializer::Message::allocEncodeJOINREQ(
+    msg = Serializer::Message::allocEncodeJOIN(
         self.address, self.id, self.ring_id, self.heartbeat, msgsize);
 }
 
-void joinreq_client::start() {
+void join_client::start() {
     app.info("Trying to join...");
 
-    //send JOINREQ message to introducer member
+    //send JOIN message to introducer member
     bool success = true;
     try {
         ba::ip::tcp::endpoint endpoint(
@@ -114,11 +114,11 @@ void joinreq_client::start() {
         socket = shared_socket(new tcp::socket(app.get_context()));
         socket->connect(endpoint);
         auto packet_recv = packet_receiver::create(app, socket, 
-            bind(&joinreq_client::handle_response, shared_from_this(),
+            bind(&join_client::handle_response, shared_from_this(),
                  boost::placeholders::_1
         ));
         ba::async_write(*socket, msg->buffer(),
-                bind(&joinreq_client::handle_write, shared_from_this(),
+                bind(&join_client::handle_write, shared_from_this(),
                     ba::placeholders::error,
                     ba::placeholders::bytes_transferred,
                     packet_recv
@@ -130,26 +130,26 @@ void joinreq_client::start() {
         success = false;
     }
     if (!success) {
-        if (joinreq_retry++ < MyConst::joinreq_retry_max) {
+        if (join_retry++ < MyConst::join_retry_max) {
             app.info("cannot join the group, retry later ...");
-            timer.expires_from_now(bpt::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
-            timer.async_wait(bind(&joinreq_client::start, shared_from_this()));
+            timer.expires_from_now(bpt::seconds(MyConst::join_retry_factor * join_retry));
+            timer.async_wait(bind(&join_client::start, shared_from_this()));
         }
         else {
             app.info("failed to join the group");
             exit(1);
         }
     }
-    joinreq_retry = 0;
+    join_retry = 0;
 }
 
-void joinreq_client::handle_write(const boost::system::error_code & ec, size_t bytes_transferred,
+void join_client::handle_write(const boost::system::error_code & ec, size_t bytes_transferred,
     packet_receiver::pointer pr) {
     if (ec || bytes_transferred != msg->size) {
-        if (joinreq_retry++ < MyConst::joinreq_retry_max) {
+        if (join_retry++ < MyConst::join_retry_max) {
             app.info("cannot join the group, retry later ...");
-            timer.expires_from_now(bpt::seconds(MyConst::joinreq_retry_factor * joinreq_retry));
-            timer.async_wait(bind(&joinreq_client::start, shared_from_this()));
+            timer.expires_from_now(bpt::seconds(MyConst::join_retry_factor * join_retry));
+            timer.async_wait(bind(&join_client::start, shared_from_this()));
         }
         else {
             app.info("failed to join the group");
@@ -159,7 +159,7 @@ void joinreq_client::handle_write(const boost::system::error_code & ec, size_t b
     pr->start();
 }
 
-void joinreq_client::handle_response(shared_msg msg) {
+void join_client::handle_response(shared_msg msg) {
     app.info("heared back from the group, set self to alive");
     vector<MemberInfo> adlst;
     Serializer::Message::decodeAD(msg, adlst);

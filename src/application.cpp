@@ -66,9 +66,9 @@ void application::handle_accept(packet_receiver::pointer packet_recv,
 
 void application::dispatch_packet(shared_socket socket, shared_msg msg) {
     switch(msg->msgType) {
-        case MsgType::JOINREQ: {
-            info("JOINREQ message received");
-            auto handler = joinreq_handler::create(msg, *this, socket);
+        case MsgType::JOIN: {
+            info("JOIN message received");
+            auto handler = join_handler::create(msg, *this, socket);
             handler->start();
         } break;
 
@@ -102,7 +102,7 @@ void application::update_self() {
 
 void application::update(const MemberInfo &info, bool forced) {
     if (forced) {
-        debug("Forced update for joinreq");
+        debug("Forced update for join req");
     }
     for(auto &e: members) {
         if (e == info) {
@@ -183,8 +183,8 @@ void application::introduce_self_to_group() {
     else
     {
         //add to group
-        auto joinreq = joinreq_client::create(*this);
-        joinreq->start();
+        auto jc = join_client::create(*this);
+        jc->start();
     }
 }
 

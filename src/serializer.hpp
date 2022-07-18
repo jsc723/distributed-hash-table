@@ -13,8 +13,8 @@ struct Serializer {
 
 	
 	struct Message {
-		static shared_msg allocEncodeJOINREQ(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
-		static void decodeJOINREQ(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat);
+		static shared_msg allocEncodeJOIN(const Address &addr, int id, int ring_id, int heartbeat, uint32_t &msgSize);
+		static void decodeJOIN(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat);
 		static shared_msg allocEncodeAD(const vector<MemberInfo> &lst);
 		static void decodeAD(shared_msg msg, vector<MemberInfo> &lst);
 
@@ -22,8 +22,8 @@ struct Serializer {
 		template<typename T>
 		static shared_msg allocEncode(MsgType type, T &req) {
 			int data_sz = (int)req.ByteSizeLong();
-			uint32_t msg_sz = sizeof(MessageHdr) + data_sz;
-			shared_msg msg = MessageHdr::create_shared(msg_sz);
+			uint32_t msg_sz = sizeof(MsgHdr) + data_sz;
+			shared_msg msg = MsgHdr::create_shared(msg_sz);
 			msg->msgType = type;
 			char *payload = (char*)(msg.get()+1);
 			req.SerializeToArray(payload, data_sz);

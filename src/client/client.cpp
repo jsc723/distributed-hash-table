@@ -79,14 +79,14 @@ int main(int argc, char *argv[])
 
                 ba::write(socket, msg_req->buffer());
 
-                MessageHdr hdr;
-                ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
+                MsgHdr hdr;
+                ba::read(socket, ba::buffer(&hdr, sizeof(MsgHdr)), ba::transfer_exactly(sizeof(MsgHdr)));
                 uint32_t packet_sz = hdr.size;
                 if (hdr.HEAD != MSG_HEAD) {
                     cout << "message is corruptted" << endl;
                 }
 
-                shared_msg msg_result = MessageHdr::create_shared(packet_sz);
+                shared_msg msg_result = MsgHdr::create_shared(packet_sz);
                 *msg_result = hdr;
                 ba::read(socket, msg_result->payload_buffer());
 
@@ -117,14 +117,14 @@ int main(int argc, char *argv[])
 
                 ba::write(socket, msg_req->buffer());
 
-                MessageHdr hdr;
-                ba::read(socket, ba::buffer(&hdr, sizeof(MessageHdr)), ba::transfer_exactly(sizeof(MessageHdr)));
+                MsgHdr hdr;
+                ba::read(socket, ba::buffer(&hdr, sizeof(MsgHdr)), ba::transfer_exactly(sizeof(MsgHdr)));
                 uint32_t packet_sz = hdr.size;
                 if (hdr.HEAD != MSG_HEAD) {
                     cout << "message is corruptted" << endl;
                 }
 
-                shared_msg msg_result = MessageHdr::create_shared(packet_sz);
+                shared_msg msg_result = MsgHdr::create_shared(packet_sz);
                 *msg_result = hdr;
                 ba::read(socket, msg_result->payload_buffer());
 

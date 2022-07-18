@@ -45,7 +45,7 @@ protected:
     void finish_read(const boost::system::error_code & ec,
                       size_t bytes_transferred);
 
-    MessageHdr hdr;
+    MsgHdr hdr;
     Loggable &log;
     callback_t callback;
     error_handler_t error_handler;
@@ -55,46 +55,41 @@ protected:
 };
 
 /*
- -------------------------- joinreq ----------------------------
+ -------------------------- join ----------------------------
 */
 
-class joinreq_handler: public protocol_base<joinreq_handler> {
+class join_handler: public protocol_base<join_handler> {
 public:
-    friend class protocol_base<joinreq_handler>;
+    friend class protocol_base<join_handler>;
     void start();
     void after_write() {
-        app.debug("joinreq response is sent");
-    }
-    ~joinreq_handler() {
-        app.debug("joinreq is released");
+        app.debug("join response is sent");
     }
 
 protected:
-    joinreq_handler(shared_msg msg, application &app, shared_socket socket);
+    join_handler(shared_msg msg, application &app, shared_socket socket);
     shared_socket socket;
     shared_msg response;
     application &app;
     boost::asio::streambuf buffer;
 };
 
-class joinreq_client: public protocol_base<joinreq_client> {
+class join_client: public protocol_base<join_client> {
 public:
-    friend class protocol_base<joinreq_client>;
+    friend class protocol_base<join_client>;
     void start();
     void handle_write(const boost::system::error_code & ec,
                       size_t bytes_transferred, packet_receiver::pointer pr);
     void handle_response(shared_msg msg);
-    ~joinreq_client() {
-    }
 
 protected:
-    joinreq_client(application &app);
+    join_client(application &app);
     shared_socket socket;
     application &app;
     boost::asio::streambuf buffer;
     shared_msg msg;
     boost::asio::deadline_timer timer;
-    int joinreq_retry;
+    int join_retry;
 };
 
 

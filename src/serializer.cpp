@@ -50,11 +50,11 @@ char *decodeString(char *mem, string &s) {
     return p;
 }
 	
-shared_msg Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
+shared_msg Serializer::Message::allocEncodeJOIN(const Address &myaddr, int id, int ring_id, int heartbeat, uint32_t &msgSize) {
     uint32_t addr_sz = sizeof(int) + sizeof(short);
-    msgSize = sizeof(MessageHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
-    shared_msg msg = MessageHdr::create_shared(msgSize);
-    msg->msgType = MsgType::JOINREQ;
+    msgSize = sizeof(MsgHdr) + addr_sz + sizeof(id) + sizeof(ring_id) + sizeof(heartbeat);
+    shared_msg msg = MsgHdr::create_shared(msgSize);
+    msg->msgType = MsgType::JOIN;
     auto p = msg->payload;
     p = encodeAddress(p, myaddr);
     p = Mem::write(p, id);
@@ -62,7 +62,7 @@ shared_msg Serializer::Message::allocEncodeJOINREQ(const Address &myaddr, int id
     p = Mem::write(p, heartbeat);
     return msg;
 }
-void Serializer::Message::decodeJOINREQ(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
+void Serializer::Message::decodeJOIN(shared_msg msg, Address &addr, int &id, int &ring_id, int &heartbeat) {
     auto p = msg->payload;
     p = decodeAddress(p, addr);
     p = Mem::read(p, id);
@@ -76,8 +76,8 @@ shared_msg Serializer::Message::allocEncodeAD(const vector<MemberInfo> &lst) {
                             + sizeof(MemberInfo::ring_id)
                             + sizeof(MemberInfo::heartbeat);
     uint32_t lstSize = sizeof(uint32_t) + lst.size() * entrySize;
-    uint32_t msgSize = sizeof(MessageHdr) + lstSize;
-    shared_msg msg = MessageHdr::create_shared(msgSize);
+    uint32_t msgSize = sizeof(MsgHdr) + lstSize;
+    shared_msg msg = MsgHdr::create_shared(msgSize);
     msg->msgType = MsgType::AD;
     encodeMemberList(msg->payload, lst);
 

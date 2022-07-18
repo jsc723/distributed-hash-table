@@ -19,10 +19,10 @@ using boost::bind;
 namespace ba = boost::asio;
 namespace bpt = boost::posix_time;
 
-class MessageHdr;
+class MsgHdr;
 typedef boost::posix_time::ptime timestamp_t;
 typedef shared_ptr<ba::ip::tcp::socket> shared_socket;
-typedef shared_ptr<MessageHdr> shared_msg;
+typedef shared_ptr<MsgHdr> shared_msg;
 struct MyConst {
 	static const int heartbeatInterval = 1;
 	static const int resendTimeout = 3;
@@ -31,8 +31,8 @@ struct MyConst {
 	static const int timeoutRemove = 30;
 	static const int GossipFan = 3;
   static const int check_memebr_interval = 5;
-  static const int joinreq_retry_max = 5;
-  static const int joinreq_retry_factor = 5;
+  static const int join_retry_max = 5;
+  static const int join_retry_factor = 5;
   static const int request_default_ttl = 3;
   static const uint32_t ring_size = 1 << 16;
   static const int MAX_PEER_SIZE = 16;
@@ -91,7 +91,7 @@ struct MemberInfo {
 
 enum class MsgType{
     DUMMY_START = 100,
-    JOINREQ, //char addr[6], int ring_id, long heartbeat
+    JOIN, //char addr[6], int ring_id, long heartbeat
 	  AD,      //list of nodes in the group
     GET,     //get value by key (key_t, ttl) -> (value_t, success?)
     GET_RESPONSE,
@@ -100,7 +100,7 @@ enum class MsgType{
     DUMMY_END
 };
 
-struct MessageHdr {
+struct MsgHdr {
   uint32_t HEAD;
   uint32_t size;
 	enum MsgType msgType;
@@ -112,7 +112,7 @@ struct MessageHdr {
     return ba::buffer(payload, size - sizeof(*this));
   }
   static shared_msg create_shared(uint32_t size) {
-    auto ptr = shared_msg((MessageHdr*)malloc(size), free);
+    auto ptr = shared_msg((MsgHdr*)malloc(size), free);
     ptr->HEAD = MSG_HEAD;
     ptr->size = size;
     ptr->msgType = MsgType::DUMMY_START;
