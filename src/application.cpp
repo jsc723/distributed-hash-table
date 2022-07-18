@@ -73,7 +73,6 @@ void application::dispatch_packet(shared_socket socket, MessageHdr *msg) {
         } break;
 
         case MsgType::AD: {
-            info("AD message received");
             auto handler = ad_handler::create(*this, msg);
             handler->start();
         } break;
@@ -257,6 +256,9 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
     size_t best_node_idx = 0;
     int min_diff = INT_MAX;
     for(size_t i = 0; i < members.size(); i++) {
+        if (!memberListEntryIsValid(members[i])) {
+            continue;
+        }
         int ring_id = members[i].ring_id;
         if (ring_id < ring_pos) {
             ring_id += MyConst::ring_size;
@@ -269,4 +271,19 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
     debug("key=%s, ring_pos=%d, ring_id=%d, id=%d", key.c_str(), ring_pos, 
         members[best_node_idx].ring_id, members[best_node_idx].id);
     return best_node_idx;
+}
+
+vector<MemberInfo> application::get_group_starting_at(int idx, int max_size) {
+    vector<MemberInfo> group;
+    int i = idx;
+    do {
+        if (memberListEntryIsValid(members[i])) {
+            group.emplace_back(members[i]);
+        }
+        i++;
+        if (i >= members.size()) {
+            i = 0;
+        }
+    } while(i != idx && group.size() < max_size);
+    return group;
 }

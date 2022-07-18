@@ -18,6 +18,9 @@ void packet_receiver::read_packet(const boost::system::error_code & ec, size_t b
         if (ec) {
             log.info("%s", ec.message().c_str());
         }
+        if (error_handler) {
+            error_handler();
+        }
         return;
     }
     std::istream is(&buffer);
@@ -36,10 +39,16 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
 {
     if (ec) {
         log.info("%s", ec.message().c_str());
+        if (error_handler) {
+            error_handler();
+        }
         return;
     }
     if (bytes_transferred != packet_sz - sizeof(packet_sz)) {
         log.info("did not read the whole packet, packet_sz = %u, transferred = %u", packet_sz, bytes_transferred);
+        if (error_handler) {
+            error_handler();
+        }
         return;
     }
     MessageHdr *msg = (MessageHdr *)malloc(packet_sz);
@@ -49,6 +58,9 @@ void packet_receiver::finish_read(const boost::system::error_code & ec, size_t b
     size_t actual = is.gcount();
     if (actual != bytes_transferred) {
         log.info("failed to read the whole packet, actual = %u", actual);
+        if (error_handler) {
+            error_handler();
+        }
         return;
     }
     if (callback) {
@@ -195,7 +207,7 @@ get_handler::get_handler(application &app, MessageHdr *msg, shared_socket socket
      responsed_peer_cnt(0), latest_version(0), best_peer_response_idx(0),
      is_success(false) {
     request.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
-    app.info("set req: key=%s", request.key().c_str());
+    app.info("get req: key=%s", request.key().c_str());
     Serializer::Message::dealloc(msg);
 }
 void get_handler::start() {
@@ -209,9 +221,10 @@ void get_handler::start() {
 
 void get_handler::do_coordinate() {
     int peer_idx = app.map_key_to_node_idx(request.key());
-    auto peer = app.get_member(peer_idx);
-    app.info("route get request to peer id = %d", peer.id);
-    peers.emplace_back(peer);
+    peers = app.get_group_starting_at(peer_idx, MyConst::ReplicaSize);
+    for(auto &p: peers) {
+        app.info("route get request to peer id = %d", p.id);
+    }
 
     request.set_sender_id(app.self_info().id);
     msg_to_peers = Serializer::Message::allocEncode(MsgType::GET, request);
@@ -222,7 +235,10 @@ void get_handler::do_coordinate() {
             auto peer_socket = shared_socket(new tcp::socket(app.get_context()));
             peer_sockets.emplace_back(peer_socket);
             peer_socket->async_connect(endpoint, 
-                bind(&get_handler::send_req_to_peer, shared_from_this(), idx));
+                bind(&get_handler::send_req_to_peer, 
+                    shared_from_this(),
+                    idx
+                ));
         }
         catch (std::exception& e)
         {
@@ -232,10 +248,17 @@ void get_handler::do_coordinate() {
 }
 
 void get_handler::send_req_to_peer(int idx) {
+    if (!peer_sockets[idx]->is_open()) {
+        app.info("failed to connect to peer id = %d", peers[idx].id);
+        responsed_peer_cnt++;
+        return;
+    }
     try {
         auto prc = packet_receiver::create(app, peer_sockets[idx], 
             bind(&get_handler::read_peer_response, shared_from_this(), 
             idx, boost::placeholders::_1));
+        prc->set_error_handler(bind(&get_handler::prc_error_handler, shared_from_this(),
+            idx));
         
         ba::async_write(*peer_sockets[idx], ba::buffer(msg_to_peers, msg_to_peers->size),
             bind(&get_handler::start_prc, shared_from_this(), prc));
@@ -256,23 +279,13 @@ void get_handler::read_peer_response(int idx, MessageHdr *msg) {
     try {
         auto &res = peer_response[idx];
         res.ParseFromArray(msg->payload, msg->size - sizeof(MessageHdr));
-        if (res.success() && res.value().version() > latest_version) {
+        if (res.success() && res.value().version() >= latest_version) {
             is_success = true;
             latest_version = res.value().version();
             best_peer_response_idx = idx;
         }
         if(responsed_peer_cnt == peers.size()) {
-            if (is_success) {
-                response = peer_response[best_peer_response_idx];
-            } else {
-                response.set_success(false);
-            }
-            response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
-
-            auto prc = packet_receiver::create_dispatcher(app, socket);
-            ba::async_write(*socket, ba::buffer(response_msg, response_msg->size), 
-                bind(&get_handler::start_prc, shared_from_this(), prc)
-            );
+            send_response();
         }
     }
     catch (std::exception& e)
@@ -281,19 +294,41 @@ void get_handler::read_peer_response(int idx, MessageHdr *msg) {
     }
 }
 
+void get_handler::prc_error_handler(int idx) {
+    app.info("handle prc read error");
+    responsed_peer_cnt++;
+    if(responsed_peer_cnt == peers.size()) {
+        send_response();
+    }
+}
+
+void get_handler::send_response() {
+    if (is_success) {
+        response = peer_response[best_peer_response_idx];
+    } else {
+        response.set_success(false);
+    }
+    response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
+
+    auto prc = packet_receiver::create_dispatcher(app, socket);
+    ba::async_write(*socket, ba::buffer(response_msg, response_msg->size), 
+        bind(&get_handler::start_prc, shared_from_this(), prc)
+    );
+}
+
 void get_handler::do_execute() {
     app.debug("do GET for %s", request.key().c_str());
     auto val_exist = app.get_store().get(request.key());
     response.set_responder_id(app.self_info().id);
     if (!val_exist.second) { //not ok
         response.set_success(false);
-        app.debug("found key");
+        app.debug("not found key");
     } else {
         auto val = val_exist.first;
         response.set_success(true);
         response.mutable_value()->set_value(val.value);
         response.mutable_value()->set_version(val.version);
-        app.debug("did not found key");
+        app.debug("found key");
     }
     response_msg = Serializer::Message::allocEncode(MsgType::GET_RESPONSE, response);
     ba::async_write(*socket, ba::buffer(response_msg, response_msg->size),
@@ -327,9 +362,10 @@ void set_handler::start() {
 
 void set_handler::do_coordinate() {
     int peer_idx = app.map_key_to_node_idx(request.key());
-    auto peer = app.get_member(peer_idx);
-    app.info("route set request to peer id = %d", peer.id);
-    peers.emplace_back(peer);
+    peers = app.get_group_starting_at(peer_idx, MyConst::ReplicaSize);
+    for(auto &p: peers) {
+        app.info("route set request to peer id = %d", p.id);
+    }
 
     request.set_sender_id(app.self_info().id);
     request_msg = Serializer::Message::allocEncode(MsgType::SET, request);
@@ -349,12 +385,6 @@ void set_handler::do_coordinate() {
 }
 void set_handler::do_execute() {
     app.info("be selected as the storage node");
-    //check if this node can execute the SET (i.e. is there a lock on it now?)
-    //if ok, set a lock on the key, response a single byte = 0x1 (true)
-        //then wait for a single byte from peer (with a timeout) for the commit message
-        //if commit message = 0x1, commit it
-        //if not or timeout, release lock, close socket
-    //if not, response with a single byte = 0x0 (false), don't wait for lock
     if (app.get_store().lock(request.key())) {
         app.debug("got the lock for %s", request.key().c_str());
         response_to_cood = 1;
@@ -375,6 +405,7 @@ void set_handler::handle_commit() {
         app.info("SET %s to %s", request.key().c_str(), request.value().value().c_str());
         app.get_store().set(request.key(), request.value());
         app.info("release lock for %s", request.key().c_str());
+        auto check = app.get_store().get(request.key());
         final_response_to_cood = 1;
     } else {
         app.info("SET %s ABORTED", request.key().c_str());

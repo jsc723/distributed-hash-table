@@ -22,10 +22,15 @@ public:
     static int nextId;
     int id;
     typedef boost::function<void(MessageHdr *)> callback_t;
+    typedef boost::function<void()> error_handler_t;
     void start(); //read packet size
     shared_socket get_socket() {
         return socket;
     }
+    void set_error_handler(error_handler_t handler) {
+        error_handler = handler;
+    }
+
     static pointer create_dispatcher(application &app, shared_socket socket) {
         return create(app, socket, bind(&application::dispatch_packet,
             &app, socket, boost::placeholders::_1));
@@ -42,6 +47,7 @@ protected:
 
     Loggable &log;
     callback_t callback;
+    error_handler_t error_handler;
     shared_socket socket;
     boost::asio::streambuf buffer;
     uint32_t packet_sz;
@@ -190,10 +196,12 @@ public:
     void send_req_to_peer(int idx);
     void read_peer_response(int idx, MessageHdr *msg);
     void start_prc(packet_receiver::pointer prc);
+    void prc_error_handler(int idx);
+    void send_response();
 
     void do_execute();
     void after_response();
-    
+
     ~get_handler() {
         app.debug("release get_handler");
         Serializer::Message::dealloc(response_msg);
@@ -212,6 +220,7 @@ protected:
     //coordinator
     vector<MemberInfo> peers;
     vector<shared_socket> peer_sockets;
+    int connected_peer_cnt;
     int responsed_peer_cnt;
     vector<dh_message::GetResponse> peer_response;
     int best_peer_response_idx;

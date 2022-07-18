@@ -33,6 +33,7 @@ struct MyConst {
   static const int request_default_ttl = 3;
   static const uint32_t ring_size = 1 << 16;
   static const int MAX_PEER_SIZE = 16;
+  static const int ReplicaSize = 3;
 };
 
 inline timestamp_t get_local_time() {

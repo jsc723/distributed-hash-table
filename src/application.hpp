@@ -82,6 +82,7 @@ public:
         return members[idx];
     }
     int map_key_to_node_idx(const data_store::key_t &key);
+    vector<MemberInfo> get_group_starting_at(int idx, int max_size);
 
     virtual void vlog(LogLevel level, const char *format, va_list args){
         sprintf(prefix_buf, "[id=%d][h=%d] ", self_info().id, self_info().heartbeat);

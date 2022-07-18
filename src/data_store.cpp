@@ -10,13 +10,17 @@ pair<data_store::value_t, bool> data_store::get(const data_store::key_t& key) {
 }
 
 bool data_store::set(const data_store::key_t &key, const data_store::value_t& val) {
-    if (m.count(key) == 0 || m[key].version < val.version) {
+    logger.log(LogLevel::DEBUG, "data_storen", "key=%s, version=%ld", key.c_str(), val.version);
+    if (m.count(key) == 0 || m[key].version < val.version || val.version == 0) {
         m[key] = val;
+        logger.log(LogLevel::DEBUG, "data_store ", "setted");
         return true;
     }
     if (m[key] == val) {
+        logger.log(LogLevel::DEBUG, "data_store ", "setted2");
         return true;
     }
+    logger.log(LogLevel::DEBUG, "data_store ", "not setted");
     return false;
 }
 
