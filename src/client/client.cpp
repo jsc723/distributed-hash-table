@@ -56,6 +56,9 @@ int main(int argc, char *argv[])
             to_lower(cmd[0]);
             if (cmd[0] == "set")
             {
+                if (cmd.size() == 3) {
+                    cmd.emplace_back("0");
+                }
                 if (cmd.size() != 4)
                 {
                     cout << "invalid num of args" << endl;
