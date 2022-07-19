@@ -3,11 +3,12 @@ A minimal masterless distributed in-memory key-value database (distributed hash 
 
 ## Features
 - Scalable and highly available
+- Fault tolerance through replication
 - IO Concurrency on each node through Boost.Asio
 - Gossip-stype membership protocol
-- Distributing keys evenly in the cluster through a Gossip-style membership protocol
+- Distributing keys evenly in the cluster through consistant hashing
 - Atomic write operation through the two-phase commit protocol
-- Eventual Consistency achieved by letting each node periodically pushing some records to their neighbors
+- Eventual Consistency achieved by letting each node periodically pushing records to neighbors
 
 ## Dependencies
 On Linux (I'm using Ubuntu 16), install all the dependencies
