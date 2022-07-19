@@ -36,6 +36,36 @@ script/start-cluster-10.sh # start a cluster of size 10
 script/stop-cluster.sh  # stop all dhserver instances
 ```
 
+## Example
+```
+$ script/start-cluster-10.sh
+$ bin/client 9002
+> set k1 v1
+ok
+> set k2 v2
+ok
+> set k3 v3
+ok
+> set hello world
+ok
+> get k1
+v1
+> get k2
+v2
+> exit
+$ bin/client 9005
+> get hello
+world
+> get k1
+v1
+> get k3
+v3
+> exit
+$ script/stop-cluster.sh
+$
+```
+
+
 ## Configuration
 check `struct DHConst` in `utils.hpp`
 
