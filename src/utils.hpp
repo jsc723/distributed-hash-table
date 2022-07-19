@@ -2,7 +2,7 @@
 #include "headers.hpp"
 #include "logger.hpp"
 #define LOCALHOST "127.0.0.1"
-#define BOOTSTRAP_IP LOCALHOST
+#define BOOTSTRAP_IP "127.0.0.1"
 #define BOOTSTRAP_PORT 9000
 #define MSG_HEAD 0xbeefcade
 
