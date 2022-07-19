@@ -215,7 +215,7 @@ void ad_handler::start() {
 get_handler::get_handler(application &app, shared_msg msg, shared_socket socket)
     :app(app), socket(socket), response_msg(nullptr), msg_to_peers(nullptr),
      responsed_peer_cnt(0), latest_version(0), best_peer_response_idx(0),
-     is_success(false) {
+     is_success(false), timer(app.get_context()) {
     request.ParseFromArray(msg->payload, msg->payload_size());
     app.info("get req: key=%s", request.key().c_str());
 }
@@ -254,6 +254,14 @@ void get_handler::do_coordinate() {
             app.info("%s", e.what());
         }
     }
+
+    timer.expires_from_now(bpt::seconds(DHConst::CommunicationTimeout));
+    timer.async_wait([self=shared_from_this()](const boost::system::error_code &ec) {
+        if (ec == ba::error::operation_aborted) {
+            return;
+        }
+        self->send_response();
+    });
 }
 
 void get_handler::send_req_to_peer(int idx) {
@@ -294,6 +302,7 @@ void get_handler::read_peer_response(int idx, shared_msg msg) {
             best_peer_response_idx = idx;
         }
         if(responsed_peer_cnt == peers.size()) {
+            timer.cancel();
             send_response();
         }
     }
@@ -307,6 +316,7 @@ void get_handler::prc_error_handler(int idx) {
     app.info("handle prc read error");
     responsed_peer_cnt++;
     if(responsed_peer_cnt == peers.size()) {
+        timer.cancel();
         send_response();
     }
 }
@@ -317,6 +327,7 @@ void get_handler::send_response() {
     } else {
         response.set_success(false);
     }
+
     response_msg = Serializer::allocEncode(MsgType::GET_RESPONSE, response);
 
     auto prc = packet_receiver::create_dispatcher(app, socket);
@@ -354,7 +365,8 @@ void get_handler::after_response() {
 set_handler::set_handler(application &app, shared_msg msg, shared_socket socket)
     :app(app), socket(socket), response_msg(nullptr), request_msg(nullptr),
      responsed_peer_cnt(0), peer_commit_req(nullptr), response_to_cood(nullptr),
-     final_response_to_cood(nullptr), final_responsed_peer_cnt(0), is_coordinator(false)  {
+     final_response_to_cood(nullptr), final_responsed_peer_cnt(0), is_coordinator(false),
+     timer(app.get_context())  {
     request.ParseFromArray(msg->payload, msg->payload_size());
     app.info("set req: key=%s, val=%s, version=%ld", 
         request.key().c_str(), request.value().value().c_str(), request.value().version());
@@ -385,7 +397,7 @@ void set_handler::do_coordinate() {
             ba::ip::tcp::endpoint endpoint(ba::ip::address(peers[idx].address.ip), peers[idx].address.port);
             auto peer_socket = shared_socket(new tcp::socket(app.get_context()));
             peer_sockets.emplace_back(peer_socket);
-            peer_response.emplace_back();
+            peer_response.emplace_back(0);
             peer_socket->async_connect(endpoint, 
                 bind(&set_handler::send_req_to_peer, shared_from_this(), idx));
         }
@@ -394,8 +406,15 @@ void set_handler::do_coordinate() {
             app.info("%s", e.what());
         }
     }
-}
 
+    timer.expires_from_now(bpt::seconds(DHConst::CommunicationTimeout));
+    timer.async_wait([self=shared_from_this()] (const boost::system::error_code &ec) {
+        if (ec == ba::error::operation_aborted) {
+            return;
+        }
+        self->send_commit_message();
+    });
+}
 
 ///////////////////set handler coordinator///////////////////////
 
@@ -414,6 +433,7 @@ void set_handler::send_req_to_peer(int idx) {
     {
         app.info("send_req_to_peer, peer id = %d: %s", peers[idx].id, e.what());
     }
+
 }
 
 void set_handler::handle_peer_response(shared_msg res_msg, int idx) {
@@ -424,31 +444,48 @@ void set_handler::handle_peer_response(shared_msg res_msg, int idx) {
 
     peer_response[idx] = bmsg.val();
     if (responsed_peer_cnt == peers.size()) {
-        dh_message::SingleIntMessage bmsg;
-        bmsg.set_val(true);
-        for(int i = 0; i < peers.size(); i++) {
-            if (!peer_response[i]) {
-                app.info("decided to not commit");
-                bmsg.set_val(false);
-                break;
-            }
-        }
-        peer_commit_req = Serializer::allocEncode(MsgType::DUMMY_START, bmsg);
-        for(int idx = 0; idx < peers.size(); idx++) {
-            ba::async_write(*peer_sockets[idx], peer_commit_req->buffer(),
-                bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
-        }
+        timer.cancel();
+        send_commit_message();
     }
 }
+void set_handler::send_commit_message() {
+    dh_message::SingleIntMessage bmsg;
+    bmsg.set_val(true);
+    for(int i = 0; i < peers.size(); i++) {
+        if (!peer_response[i]) {
+            app.info("decided to not commit");
+            bmsg.set_val(false);
+            break;
+        }
+    }
+    peer_commit_req = Serializer::allocEncode(MsgType::DUMMY_START, bmsg);
+    for(int idx = 0; idx < peers.size(); idx++) {
+        try {
+        ba::async_write(*peer_sockets[idx], peer_commit_req->buffer(),
+            bind(&set_handler::after_commit_to_peer, shared_from_this(), idx));
+        } catch (std::exception &e) {
+            app.info("send_commit_message, peer id = %d: %s", peers[idx].id, e.what());
+        }
+    }
+    timer.expires_from_now(bpt::seconds(DHConst::CommunicationTimeout));
+    timer.async_wait([self=shared_from_this()](const boost::system::error_code &ec) {
+        if (ec == ba::error::operation_aborted) {
+            return;
+        }
+        self->coordinator_finish();
+    });
+}
+
 void set_handler::after_commit_to_peer(int idx) {
     final_responsed_peer_cnt++;
     app.info("after_commit_to_peer, peer id = %d, final_responsed_peer_cnt=%d", peers[idx].id, final_responsed_peer_cnt);
     if (final_responsed_peer_cnt == peers.size()) {
-        send_response();
+        timer.cancel();
+        coordinator_finish();
     }
 }
 
-void set_handler::send_response() {
+void set_handler::coordinator_finish() {
     int ok = 0, failed = 0;
     for(int i = 0; i < peers.size(); i++) {
         if (peer_response[i]) {
@@ -473,7 +510,7 @@ void set_handler::prc_error_handler() {
     responsed_peer_cnt++;
     final_responsed_peer_cnt++;
     if (final_responsed_peer_cnt == peers.size()) {
-        send_response();
+        coordinator_finish();
     }
 }
 
@@ -497,9 +534,29 @@ void set_handler::do_execute() {
         bind(&set_handler::handle_commit, shared_from_this(), boost::placeholders::_1));
     ba::async_write(*socket, response_to_cood->buffer(),
         bind(&set_handler::start_prc, shared_from_this(), prc));
+
+    timer.expires_from_now(bpt::seconds(DHConst::CommunicationTimeout));
+    timer.async_wait([self=shared_from_this()](const boost::system::error_code &ec) {
+        if (ec == ba::error::operation_aborted) {
+        return;
+        }
+        self->commit_abort();
+    });
+}
+
+void set_handler::commit_abort() {
+    app.info("SET %s ABORTED", request.key().c_str());
+    if (app.get_store().check_lock(request.key())) {
+        app.info("release lock for %s", request.key().c_str());
+        app.get_store().release(request.key());
+    }
+    socket->cancel();
+    socket->close();
 }
 
 void set_handler::handle_commit(shared_msg commit_msg) {
+    timer.cancel();
+
     dh_message::SingleIntMessage b;
     b.ParseFromArray(commit_msg->payload, commit_msg->payload_size());
     bool commit_from_cood = b.val();
@@ -597,7 +654,7 @@ void push_handler::start() {
     for(int i = 0; i < proto_push.kv_size(); i++) {
         string k = proto_push.kv(i).key();
         data_store::value_t v(proto_push.kv(i).value());
-        if (app.get_store().lock(k)) {
+        if (app.self_is_responsible_for_key(k) && app.get_store().lock(k)) {
             if (app.get_store().set(k, v)) {
                 updated++;
             }

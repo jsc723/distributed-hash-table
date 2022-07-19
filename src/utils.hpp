@@ -39,6 +39,7 @@ struct DHConst {
   static const int PushMaxCount = 5;
   static const int PushInterval = 5;
   static const int PushRandomStringLen = 3;
+  static const int CommunicationTimeout = 5;
 };
 
 inline timestamp_t get_local_time() {

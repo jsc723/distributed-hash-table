@@ -142,12 +142,14 @@ public:
     void send_req_to_peer(int idx);
     void read_peer_response(shared_msg res_msg, int idx);
     void handle_peer_response(shared_msg res_msg, int idx);
+    void send_commit_message();
     void after_commit_to_peer(int idx);
-    void send_response();
+    void coordinator_finish();
     void prc_error_handler();
 
     //executor
     void handle_commit(shared_msg commit_msg);
+    void commit_abort();
     void after_final_response();
 
     ~set_handler() {
@@ -175,6 +177,7 @@ protected:
     shared_msg final_response_to_cood;
 
     bool is_coordinator;
+    ba::deadline_timer timer;
 };
 
 //--------------------------GET----------------------------------
@@ -218,8 +221,7 @@ protected:
     uint64_t latest_version;
     bool is_success;
 
-    //executor
-
+    ba::deadline_timer timer;
 };
 
 

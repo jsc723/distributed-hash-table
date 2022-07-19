@@ -68,6 +68,9 @@ public:
         return members[(self_index + 1) % members.size()];
     }
 
+
+    bool self_is_responsible_for_key(const string &key);
+
     MemberInfo &self_info() {
         return members[self_index];
     }

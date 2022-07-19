@@ -1,6 +1,6 @@
 # tool macros
 CC := g++ # FILL: the compiler
-CCFLAGS := --std=c++11# FILL: compile flags
+CCFLAGS := --std=c++14# FILL: compile flags
 DBGFLAGS := -g
 CCOBJFLAGS := $(CCFLAGS) -c
 LIBRA := -lboost_system -lboost_thread -pthread -lprotobuf

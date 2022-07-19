@@ -290,6 +290,7 @@ int application::map_key_to_node_idx(const data_store::key_t &key) {
 }
 
 vector<MemberInfo> application::get_group_starting_at(int idx, int max_size) {
+    debug("start get_group_starting_at");
     vector<MemberInfo> group;
     int i = idx;
     do {
@@ -301,5 +302,18 @@ vector<MemberInfo> application::get_group_starting_at(int idx, int max_size) {
             i = 0;
         }
     } while(i != idx && group.size() < max_size);
+    debug("end get_group_starting_at");
     return group;
+}
+
+bool application::self_is_responsible_for_key(const string &key) {
+    auto start = map_key_to_node_idx(key);
+    if (self_index >= start && self_index < start + DHConst::ReplicaSize) {
+        return true;
+    }
+    int extra = start + DHConst::ReplicaSize - members.size();
+    if (extra > 0 && self_index < extra) {
+        return true;
+    }
+    return false;
 }

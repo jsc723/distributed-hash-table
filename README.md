@@ -12,5 +12,5 @@
 9. set replica [ok]
     - todo: commit messages needs to be sent over packets, not a single byte [ok]
 10. get/set replica tested working [ok]
-11. eventual consistancy
-12. refactor
+11. eventual consistancy (PUSH) [ok]
+12. refactor [ok]
