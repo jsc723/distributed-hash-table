@@ -223,4 +223,34 @@ protected:
 };
 
 
+///////////////////////////PUSH////////////////////////////////
+// selects some key & value and send them to prev and next nodes
 
+class push_sender: public protocol_base<push_sender> {
+public:
+    friend class protocol_base<push_sender>;
+    void start();
+
+protected:
+    push_sender(application &app);
+
+    void async_connect_send(const Address &addr);
+    void async_send(shared_socket socket);
+    void after_send(shared_socket socket) {
+        //need to hold a pointer to socket otherwise it is destroied
+    }
+    shared_msg msg;
+    application &app;
+};
+
+class push_handler : public protocol_base<push_handler> {
+public:
+    friend class protocol_base<push_handler>;
+    void start();
+
+protected:
+    push_handler(application &app, shared_msg msg):
+        app(app), msg(msg) {}
+    shared_msg msg;
+    application &app;
+};

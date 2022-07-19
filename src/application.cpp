@@ -36,6 +36,9 @@ void application::init() {
     add_repeating_task(bind(&application::ad_loop, this),
         bpt::seconds(DHConst::GossipInterval));
 
+    add_repeating_task(bind(&application::push_loop, this),
+        bpt::seconds(DHConst::PushInterval));
+
     add_repeating_task(bind(&application::check_member_loop, this),
         bpt::seconds(DHConst::CheckMemberInterval));
 
@@ -87,6 +90,12 @@ void application::dispatch_packet(shared_socket socket, shared_msg msg) {
         case MsgType::SET: {
             info("SET message received");
             auto handler = set_handler::create(*this, msg, socket);
+            handler->start();
+        } break;
+
+        case MsgType::PUSH: {
+            info("PUSH message received");
+            auto handler = push_handler::create(*this, msg);
             handler->start();
         } break;
 
@@ -224,6 +233,12 @@ void application::heartbeat_loop() {
 void application::ad_loop() {
     debug("Send AD");
     auto sender = ad_sender::create(*this);
+    sender->start();
+}
+
+void application::push_loop() {
+    debug("Send PUSH");
+    auto sender = push_sender::create(*this);
     sender->start();
 }
 

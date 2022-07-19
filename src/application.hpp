@@ -42,6 +42,7 @@ public:
     void heartbeat_loop();
     void ad_loop();
     void check_member_loop();
+    void push_loop();
     // -------------------------
 
     bool add_node(const MemberInfo &member);
@@ -52,6 +53,20 @@ public:
 
     vector<MemberInfo> getValidMembers();
     vector<Address> sampleNodes(int k);
+    MemberInfo prevNode() {
+        if (members.size() == 0) {
+            critical("prevNode: member size is 0");
+            exit(1);
+        }
+        return members[(self_index + (members.size() - 1)) % members.size()];
+    }
+    MemberInfo nextNode() {
+        if (members.size() == 0) {
+            critical("nextNode: member size is 0");
+            exit(1);
+        }
+        return members[(self_index + 1) % members.size()];
+    }
 
     MemberInfo &self_info() {
         return members[self_index];

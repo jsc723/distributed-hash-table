@@ -60,3 +60,13 @@ message JoinRequest {
 message Advertisement {
     repeated MemberInfo member = 1;
 }
+
+message KVPair {
+    string key = 1;
+    VersionedValue value = 2;
+}
+
+message Push {
+    MemberInfo sender = 1;
+    repeated KVPair kv = 2;
+}

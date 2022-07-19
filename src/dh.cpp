@@ -9,6 +9,7 @@ using boost::shared_ptr;
 
 int main(int argc, char *argv[])
 {
+    srand((unsigned)time(NULL));
     logger.set_log_level(LogLevel::DEBUG);
     try
     {

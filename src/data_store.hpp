@@ -20,7 +20,8 @@ public:
     bool lock(const key_t &key);
     bool check_lock(const key_t &key);
     void release(const key_t &key);
+    vector<pair<key_t, value_t>> get_multiple_lower_bound(const key_t &key, int count);
 private:
-    unordered_map<key_t, value_t> m;
+    map<key_t, value_t> m;
     unordered_set<key_t> locks;
 };

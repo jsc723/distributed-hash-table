@@ -35,3 +35,25 @@ bool data_store::check_lock(const key_t &key) {
 void data_store::release(const key_t &key) {
     locks.erase(key);
 }
+
+vector<pair<data_store::key_t, data_store::value_t>> data_store::get_multiple_lower_bound(const key_t &key, int count) {
+    vector<pair<data_store::key_t, data_store::value_t>> res;
+    auto it = m.lower_bound(key);
+    bool around = false;
+    while(count > 0) {
+        if (it == m.end()) {
+            if (!around) {
+                it = m.begin();
+                around = true;
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        res.emplace_back(*it);
+        count--;
+        it++;
+    }
+    return res;
+}

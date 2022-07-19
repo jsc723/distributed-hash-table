@@ -1,9 +1,11 @@
 #include <ctime>
 #include <cstdio>
+#include <cstdlib>
 #include <stdarg.h>
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>

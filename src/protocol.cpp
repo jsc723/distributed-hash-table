@@ -530,3 +530,79 @@ void set_handler::handle_commit(shared_msg commit_msg) {
 void set_handler::after_final_response() {
     //nothing
 }
+
+
+///////////////////////////PUSH////////////////////////////
+
+push_sender::push_sender(application &app)
+    :app(app)
+{
+    auto random_key = random_string(DHConst::PushRandomStringLen);
+    app.debug("random key = %s", random_key.c_str());
+    auto entries = app.get_store().get_multiple_lower_bound(random_key, DHConst::PushMaxCount);
+    dh_message::Push proto_push;
+    *proto_push.mutable_sender() = app.self_info().toProto();
+    for(auto &e: entries) {
+        app.debug("entry: %s => %s", e.first.c_str(), e.second.value.c_str());
+        auto ptr = proto_push.add_kv();
+        ptr->set_key(e.first);
+        ptr->mutable_value()->set_value(e.second.value);
+        ptr->mutable_value()->set_version(e.second.version);
+    }
+    app.debug("pushs %d records", proto_push.kv_size());
+    msg = Serializer::allocEncode(MsgType::PUSH, proto_push);
+}
+
+void push_sender::start() {
+    auto prev = app.prevNode();
+    auto next = app.nextNode();
+    if (prev == app.self_info()) {
+        return; //this node is the only node in the cluster
+    }
+    app.debug("send to next node = %d", next.id);
+    async_connect_send(next.address);
+    if (!(prev == next)) {
+        app.debug("send to prev node = %d", prev.id);
+        async_connect_send(prev.address);
+    }
+}
+void push_sender::async_connect_send(const Address &addr) {
+    try {
+        ba::ip::tcp::endpoint endpoint(ba::ip::address(addr.ip), addr.port);
+        auto socket = shared_socket(new tcp::socket(app.get_context()));
+        socket->async_connect(endpoint, bind(&push_sender::async_send, shared_from_this(), socket));
+    }
+    catch (std::exception& e)
+    {
+        app.info("%s", e.what());
+    }
+}
+void push_sender::async_send(shared_socket socket) {
+    try {
+        ba::async_write(*socket, msg->buffer(), 
+            bind(&push_sender::after_send, shared_from_this(), socket));
+    }
+    catch (std::exception& e)
+    {
+        app.info("%s", e.what());
+    }
+}
+
+void push_handler::start() {
+    dh_message::Push proto_push;
+    proto_push.ParseFromArray(msg->payload, msg->payload_size());
+    app.info("handle push, received %d records from node %d",
+         proto_push.kv_size(), proto_push.sender().id());
+    int updated = 0;
+    for(int i = 0; i < proto_push.kv_size(); i++) {
+        string k = proto_push.kv(i).key();
+        data_store::value_t v(proto_push.kv(i).value());
+        if (app.get_store().lock(k)) {
+            if (app.get_store().set(k, v)) {
+                updated++;
+            }
+            app.get_store().release(k);
+        }
+    }
+    app.info("updated %d records", updated);
+}
