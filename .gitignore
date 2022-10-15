@@ -7,3 +7,5 @@ logs/
 *.pb.*
 *.o
 *.gch
+*.tar
+*.tar.gz
