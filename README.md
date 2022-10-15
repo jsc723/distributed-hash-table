@@ -34,7 +34,7 @@ make deepclean #clean binaries + precompiled header file
 # start a bootstrap node (first node in the group)
 dhserver <id> <ip> <port> <ring_id>
 
-# add a new node to the group by connecting to the bootstrap node
+# add a new node to the group created by the bootstrap node at <bootstrap_ip>:<bootstrap_port>
 dhserver <id> <ip> <port> <ring_id> <bootstrap_ip> <bootstrap_port>
 ```
 
