@@ -37,6 +37,27 @@ script/start-cluster-10.sh # start a cluster of size 10
 script/stop-cluster.sh  # stop all dhserver instances
 ```
 
+Note: currently all nodes runs on the same machine with different port number, but it is easy to 
+extend to multiple machines.
+
+## Usage
+First, start a cluster and then connect to a node in the cluster using client
+
+#### set a key to a value
+```
+set <key> <value>
+```
+
+#### get value of a key
+```
+get <key>
+```
+
+#### exit client
+```
+exit
+```
+
 ## Example
 ```
 $ script/start-cluster-10.sh
