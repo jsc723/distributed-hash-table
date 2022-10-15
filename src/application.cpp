@@ -4,12 +4,14 @@
 #include "serializer.hpp"
 
 
-application::application(boost::asio::io_context &io_context, int id, unsigned short port, int ring_id)
+application::application(boost::asio::io_context &io_context, int id, string ip, unsigned short port, int ring_id,
+                        string bootstrap_ip, unsigned short bootstrap_port)
         : io_context(io_context), acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
 {
+    is_bootstrap_server = bootstrap_ip == BOOTSTRAP_IP && bootstrap_port == BOOTSTRAP_PORT;
     boost::system::error_code ec;
     Address address;
-    address.ip = boost::asio::ip::make_address_v4(LOCALHOST, ec);
+    address.ip = boost::asio::ip::make_address_v4(ip, ec);
     if (ec)
     {
         logger.log(LogLevel::CRITICAL, "", "unable to resolve ip address");
@@ -17,8 +19,8 @@ application::application(boost::asio::io_context &io_context, int id, unsigned s
     }
     address.port = port;
 
-    bootstrap_address.ip = boost::asio::ip::make_address_v4(LOCALHOST, ec);
-    bootstrap_address.port = BOOTSTRAP_PORT;
+    bootstrap_address.ip = boost::asio::ip::make_address_v4(bootstrap_ip, ec);
+    bootstrap_address.port = bootstrap_port;
     MemberInfo self(address, id, ring_id);
     members.emplace_back(self);
     self_index = 0;
@@ -185,7 +187,7 @@ vector<Address> application::sampleNodes(int maxCount) {
 
 void application::join_cluster() {
     MemberInfo &self = self_info();
-    if (self.address == bootstrap_address)
+    if (is_bootstrap_server)
     {
         info("Starting up group");
         self.isAlive = true;

@@ -13,16 +13,20 @@ int main(int argc, char *argv[])
     logger.set_log_level(LogLevel::DEBUG);
     try
     {
-        if (argc != 4)
+        if (argc != 5 && argc != 7)
         {
-            std::cout << "Usage: dh <id> <port> <ring_id>" << std::endl;
+            std::cout << "Usage: dh <id> <ip> <port> <ring_id> [<bootstrap_ip> <bootstrap_port>]" << std::endl;
             return 1;
         }
         int id = boost::lexical_cast<int>(argv[1]);
-        unsigned short port = boost::lexical_cast<unsigned short>(argv[2]);
-        int ring_id = boost::lexical_cast<int>(argv[3]);
+        string ip = argv[2];
+        unsigned short port = boost::lexical_cast<unsigned short>(argv[3]);
+        int ring_id = boost::lexical_cast<int>(argv[4]);
+        string bootstrap_ip = argc >= 6 ? argv[5] : BOOTSTRAP_IP;
+        unsigned short bootstrap_port = argc >= 7 
+            ? boost::lexical_cast<unsigned short>(argv[6]) : BOOTSTRAP_PORT;
         boost::asio::io_context io_context;
-        application app(io_context, id, port, ring_id);
+        application app(io_context, id, ip, port, ring_id, bootstrap_ip, bootstrap_port);
         app.init();
         io_context.run();
     }

@@ -23,7 +23,8 @@ public:
     typedef boost::function<void()> task_callback_t;
     typedef boost::posix_time::time_duration duration_t;
 
-    application(ba::io_context &io_context, int id, unsigned short port, int ring_id);
+    application(ba::io_context &io_context, int id, string ip, unsigned short port, int ring_id,
+                string bootstrap_ip, unsigned short bootstrap_port);
 
     void init();
 
@@ -100,6 +101,8 @@ private:
     ba::io_context &io_context;
     Address bootstrap_address;
     tcp::acceptor acceptor_;
+
+    bool is_bootstrap_server;
     
     int self_index;
     vector<MemberInfo> members;

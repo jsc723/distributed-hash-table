@@ -22,16 +22,16 @@ int main(int argc, char *argv[])
 {
     try
     {
-        if (argc != 2)
+        if (argc != 3)
         {
-            std::cerr << "Usage: client <port>" << std::endl;
+            std::cerr << "Usage: client <ip> <port>" << std::endl;
             return 1;
         }
-
-        unsigned short port = boost::lexical_cast<unsigned short>(argv[1]);
+        string server_ip = argv[1];
+        unsigned short port = boost::lexical_cast<unsigned short>(argv[2]);
 
         boost::asio::io_context io_context;
-        ba::ip::address_v4 addr = ba::ip::address_v4::from_string(LOCALHOST);
+        ba::ip::address_v4 addr = ba::ip::address_v4::from_string(server_ip);
 
         tcp::resolver resolver(io_context);
         ba::ip::tcp::endpoint endpoint(addr, port);
