@@ -3,6 +3,7 @@ bin/
 debug/
 refs/
 logs/
+release/
 .vscode
 *.pb.*
 *.o
