@@ -29,7 +29,7 @@ make deepclean #clean binaries + precompiled header file
 ```
 --------------------------------------------------------
 ## Server Usage
-#### Start a server node
+#### Start server node
 ```bash
 # start a bootstrap node (first node in the group)
 dhserver <id> <ip> <port> <ring_id>
@@ -38,23 +38,19 @@ dhserver <id> <ip> <port> <ring_id>
 dhserver <id> <ip> <port> <ring_id> <bootstrap_ip> <bootstrap_port>
 ```
 
-#### Examples
+#### Example
+On a machine with ip address = 192.168.40.129
 ```bash
-# On a machine with ip address = 192.168.40.129
-
 # start a node with id=0, self_ip=192.168.40.129, port=9000
 # ring_id=0 (for consistant hashing, default ring size = 65536)
 # start the server as the bootstrap server (the first server in the cluster)
 bin/dhserver 0 192.168.40.129 9000 0
-
 ```
 In another terminal
 ```bash
-
 # start another node with id=1, self_ip=192.168.40.129, port=9001, ring_id=30000
 # tell it to join the group created by the bootstrap server at 192.168.40.129:9000
 bin/dhserver 1 192.168.40.129 9001 30000 192.168.40.129 9000
-
 ```
 --------------------------------------
 ## Client Usage
@@ -94,7 +90,7 @@ script/stop-cluster.sh  # stop all dhserver nodes
 ```
 
 
-## Example
+## Full Example
 Suppose the local ip address is 192.168.40.129 in the following example (you need to change it to your own ip address, or 127.0.0.1)
 ```
 $ script/start-cluster-10.sh
