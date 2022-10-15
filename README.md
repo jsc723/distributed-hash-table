@@ -1,5 +1,5 @@
 # JSDB
-A minimal masterless distributed in-memory key-value database (distributed hash table)
+A masterless distributed in-memory key-value database (distributed hash table)
 
 ## Features
 - Scalable and highly available
