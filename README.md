@@ -92,4 +92,5 @@ $
 check `struct DHConst` in `utils.hpp`
 
 ## TODO
+- Support multiple machines
 - Use a config file instead of hard code the constants
