@@ -23,12 +23,12 @@ typedef boost::posix_time::ptime timestamp_t;
 typedef shared_ptr<ba::ip::tcp::socket> shared_socket;
 typedef shared_ptr<MsgHdr> shared_msg;
 struct DHConst {
-	static const int HeartBeatInterval = 1;
-	static const int ResendTimeout = 3;
-	static const int GossipInterval = 3;
-	static const int TimeoutFail = 15;
-	static const int TimeoutRemove = 30;
-	static const int GossipFan = 3;
+  static const int HeartBeatInterval = 1;
+  static const int ResendTimeout = 3;
+  static const int GossipInterval = 3;
+  static const int TimeoutFail = 15;
+  static const int TimeoutRemove = 30;
+  static const int GossipFan = 3;
   static const int CheckMemberInterval = 5;
   static const int JoinRetryMax = 5;
   static const int JoinRetryFactor = 5;
@@ -125,7 +125,7 @@ struct MemberInfo {
 enum class MsgType{
     DUMMY_START = 100,
     JOIN, //char addr[6], int ring_id, long heartbeat
-	  AD,      //list of nodes in the group
+    AD,      //list of nodes in the group
     GET,     //get value by key (key_t, ttl) -> (value_t, success?)
     GET_RESPONSE,
     SET,      //set value by key (key_t, value_t, ttl) -> success?
@@ -137,7 +137,7 @@ enum class MsgType{
 struct MsgHdr {
   uint32_t HEAD;
   uint32_t size;
-	enum MsgType msgType;
+  enum MsgType msgType;
   char payload[0];
   auto buffer() -> decltype(ba::buffer(this, size)) {
     return ba::buffer(this, size);

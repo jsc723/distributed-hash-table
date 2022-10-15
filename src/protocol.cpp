@@ -119,11 +119,11 @@ void join_client::start() {
                  boost::placeholders::_1
         ));
         ba::async_write(*socket, msg->buffer(),
-                bind(&join_client::handle_write, shared_from_this(),
-                    ba::placeholders::error,
-                    ba::placeholders::bytes_transferred,
-                    packet_recv
-                ));
+            bind(&join_client::handle_write, shared_from_this(),
+                ba::placeholders::error,
+                ba::placeholders::bytes_transferred,
+                packet_recv
+            ));
     } 
     catch (std::exception& e)
     {
