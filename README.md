@@ -2,7 +2,7 @@
 A masterless distributed in-memory key-value database (distributed hash table)
 
 ## Features
-- Highly calable and available
+- Highly scalable and available
 - Fault tolerance through replication
 - IO Concurrency on each node through asynchronous IO implemented by Boost.Asio
 - Gossip-stype membership protocol
